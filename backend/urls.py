@@ -20,6 +20,9 @@ from myapp import views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path('api/myroute/<str:param>/', views.my_view),
-    path("hello/", views.hello),
+    path("api/myroute/<str:param>/", views.my_view),
+    path("hello", views.hello, name="hello"),
+    path("signup/", views.signup),
+    path("login/", views.signin),
+    path("change-password/", views.changePasswordEndpoint),
 ]
