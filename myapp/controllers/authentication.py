@@ -6,6 +6,7 @@ import jwt
 import json
 from ..models import Users
 from uuid import UUID
+import time
 
 # chyba porobit role a ukladanie tokenov do prihlaseni
 
@@ -13,6 +14,7 @@ from uuid import UUID
 class signUpParams(TypedDict):
     username: str
     password: str
+    passwordConfirm: str
 
 
 class logInParmas(TypedDict):
@@ -39,6 +41,9 @@ class changePasswordParams(TypedDict):
 
 
 def userSignUp(params: signUpParams, SECRET_KEY: str):
+    if params["password"] != params["passwordConfirm"]:
+        return HttpResponseBadRequest()
+
     hash = bcrypt.hashpw(
         password=params["password"].encode("UTF-8"), salt=bcrypt.gensalt(15)
     )
@@ -80,10 +85,12 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
 
         if not user:
             data = json.dumps({"data": "Bad Credentials"})
+            time.sleep(0.5)
             return HttpResponseBadRequest(data)
 
     except Exception as e:
         print(e)
+        time.sleep(0.5)
         return HttpResponseBadRequest()
 
     if bcrypt.checkpw(
