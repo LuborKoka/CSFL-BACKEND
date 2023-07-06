@@ -139,7 +139,7 @@ class Tracks(models.Model):
 class Users(models.Model):
     id = models.UUIDField(primary_key=True)
 
-    login = models.CharField(unique=True, max_length=50)
+    username = models.CharField(unique=True, max_length=50)
 
     password = models.BinaryField()
 

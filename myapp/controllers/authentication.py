@@ -34,7 +34,7 @@ class changeRoleParams(TypedDict):
 
 
 class changePasswordParams(TypedDict):
-    userID: str
+    username: str
     oldPassword: str
     newPassword: str
     newPasswordConfirm: str
@@ -53,9 +53,8 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
         with connection.cursor() as c:
             c.execute(
                 """
-                    INSERT INTO users (login, password) VALUES
+                    INSERT INTO users (username, password) VALUES
                     (%s, %s)
-                    ON CONFLICT (login) DO NOTHING
                     RETURNING id
                 """,
                 userData,
@@ -78,7 +77,7 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
     user = None
     try:
         user: User = (
-            Users.objects.filter(login=params["username"])
+            Users.objects.filter(username=params["username"])
             .values("password", "id")
             .first()
         )
@@ -121,10 +120,15 @@ def changeUserRole(params: changeRoleParams):
 
 def changePassword(params: changePasswordParams):
     try:
-        user = Users.objects.filter(id=params["userID"]).values().first()
+        user = Users.objects.filter(username=params["username"]).values().first()
 
         if not user:
             return HttpResponseNotFound()
+
+        if params["newPassword"] != params["newPasswordConfirm"]:
+            return HttpResponseBadRequest(
+                json.dumps({"error": "passwords don't match"})
+            )
 
         correctPassword = bcrypt.checkpw(
             password=params["oldPassword"].encode("UTF-8"),
@@ -143,7 +147,7 @@ def changePassword(params: changePasswordParams):
             password=params["newPassword"].encode("UTF-8"), salt=bcrypt.gensalt(15)
         )
 
-        Users.objects.filter(id=params["userID"]).update(password=hash)
+        Users.objects.filter(id=str(user["id"])).update(password=hash)
 
         return HttpResponse(status=200)
 

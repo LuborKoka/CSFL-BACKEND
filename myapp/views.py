@@ -73,5 +73,5 @@ def changeRole(req: HttpRequest):
 def changePasswordEndpoint(req: HttpRequest):
     if req.method == "PATCH":
         data = json.loads(req.body)
-        return changePassword(data)
+        return changePassword(data["params"])
     return HttpResponseNotFound()
