@@ -10,6 +10,7 @@ from .controllers.authentication import (
     changeUserRole,
     changePassword,
 )
+from .controllers.report import fileUpload
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -75,3 +76,11 @@ def changePasswordEndpoint(req: HttpRequest):
         data = json.loads(req.body)
         return changePassword(data["params"])
     return HttpResponseNotFound()
+
+
+@csrf_exempt
+def uploadReport(req: HttpRequest):
+    if req.method == "POST":
+        fileUpload(req.FILES.items(), req.POST.items())
+
+    return HttpResponse(status=200)

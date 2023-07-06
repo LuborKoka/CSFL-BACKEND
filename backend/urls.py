@@ -19,10 +19,11 @@ from django.urls import path
 from myapp import views
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("api/myroute/<str:param>/", views.my_view),
-    path("hello", views.hello, name="hello"),
-    path("signup/", views.signup),
-    path("login/", views.signin),
-    path("change-password/", views.changePasswordEndpoint),
+    path("api/admin/", admin.site.urls),
+    path("api/api/myroute/<str:param>/", views.my_view),
+    path("api/hello", views.hello, name="hello"),
+    path("api/signup/", views.signup),
+    path("api/login/", views.signin),
+    path("api/change-password/", views.changePasswordEndpoint),
+    path("api/upload-report/", views.uploadReport),
 ]
