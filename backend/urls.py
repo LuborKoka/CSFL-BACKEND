@@ -26,4 +26,6 @@ urlpatterns = [
     path("api/login/", views.signin),
     path("api/change-password/", views.changePasswordEndpoint),
     path("api/upload-report/", views.uploadReport),
+    path("api/races/", views.fetchRaces),
+    path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),
 ]
