@@ -4,7 +4,7 @@ from django.db import connection
 import bcrypt
 import jwt
 import json
-from ..models import Users
+from ..models import Users, Drivers
 from uuid import UUID
 import time
 
@@ -15,6 +15,7 @@ class signUpParams(TypedDict):
     username: str
     password: str
     passwordConfirm: str
+    raceName: str
 
 
 class logInParmas(TypedDict):
@@ -39,10 +40,13 @@ class changePasswordParams(TypedDict):
     newPassword: str
     newPasswordConfirm: str
 
-
+# doplnit pri registracii race name, ak uz existuje, prepojit, ak nie, vytvorit noveho drajvera
+# doplnene
 def userSignUp(params: signUpParams, SECRET_KEY: str):
     if params["password"] != params["passwordConfirm"]:
         return HttpResponseBadRequest()
+    
+    driver = Drivers.objects.values("id").filter(name=params["raceName"]).first()       # hladam, ci race name ma zaznam v tab drivers
 
     hash = bcrypt.hashpw(
         password=params["password"].encode("UTF-8"), salt=bcrypt.gensalt(15)
@@ -63,6 +67,25 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             if len(data) == 0:
                 return HttpResponse(status=409)
             user = data
+
+            if driver == None:      # pokial dane race name este nema zaznam v drivers
+                c.execute("""
+                    INSERT INTO drivers(name)
+                    VALUES (%s)
+                    RETURNING id          
+                """, [params["raceName"]])  
+                driver = {
+                    "id": c.fetchone()[0]
+                }
+            
+            connUserDriverAccData = [str(driver["id"]), str(user[0])]
+
+            c.execute("""
+                UPDATE users
+                SET driver_id = %s
+                WHERE id = %s    
+            """, connUserDriverAccData)
+            
 
         payload = {"username": params["username"], "id": str(user[0])}
         token = jwt.encode(payload=payload, key=SECRET_KEY)
