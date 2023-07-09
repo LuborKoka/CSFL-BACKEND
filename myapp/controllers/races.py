@@ -3,6 +3,7 @@ from ..models import Races, RacesDrivers
 import json
 
 
+# race name bude treba joinovat s tracks a vytiahnut race_name z tej tabulky, az dropnem name z races
 def getRaces():
     try:
         races = Races.objects.values("name", "id")

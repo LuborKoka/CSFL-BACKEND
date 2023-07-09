@@ -22,10 +22,11 @@ urlpatterns = [
     path("api/admin/", admin.site.urls),
     path("api/api/myroute/<str:param>/", views.my_view),
     path("api/hello", views.hello, name="hello"),
-    path("api/signup/", views.signup),
-    path("api/login/", views.signin),
-    path("api/change-password/", views.changePasswordEndpoint),
-    path("api/upload-report/", views.uploadReport),
-    path("api/races/", views.fetchRaces),
-    path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),
+    path("api/signup/", views.signup),  # authentication.py
+    path("api/login/", views.signin),  # authentication.py
+    path("api/change-password/", views.changePasswordEndpoint),  # authentication.py
+    path("api/upload-report/", views.uploadReport),  # report.py
+    path("api/races/", views.fetchRaces),  # races.py
+    path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),  # races.py
+    path("api/admins/all-tracks/", views.fetchAllTracks),  # scheduleRelated.py
 ]
