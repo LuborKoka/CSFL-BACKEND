@@ -12,7 +12,13 @@ from .controllers.authentication import (
 )
 from .controllers.report import reportUpload
 from .controllers.races import getRaces, getRaceDrivers
-from .controllers.scheduleRelated import getAllAvailableTracks
+from .controllers.scheduleRelated import (
+    getAllAvailableTracks,
+    createSeason,
+    fetchAllTeamsDrivers,
+    submitTeamsDrivers,
+    postSchedule,
+)
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -106,5 +112,38 @@ def fetchRaceDrivers(req: HttpRequest, race_id: str):
 def fetchAllTracks(req: HttpRequest):
     if req.method == "GET":
         return getAllAvailableTracks()
+
+    return HttpResponseNotFound()
+
+
+# api/admins/all-tracks/
+@csrf_exempt
+def createSeasonView(req: HttpRequest):
+    if req.method == "POST":
+        data = json.loads(req.body)
+        return createSeason(data["params"])
+
+    return HttpResponseNotFound()
+
+
+# api/admins/all-teams-and-drivers/
+@csrf_exempt
+def fetchAllTeamsDriversView(req: HttpRequest):
+    if req.method == "GET":
+        return fetchAllTeamsDrivers()
+
+    if req.method == "POST":
+        print("request received")
+        data = json.loads(req.body)
+        return submitTeamsDrivers(data["params"])
+
+    return HttpResponseNotFound()
+
+
+@csrf_exempt
+def schedule(req: HttpRequest):
+    if req.method == "POST":
+        data = json.loads(req.body)
+        return postSchedule(data["params"])
 
     return HttpResponseNotFound()
