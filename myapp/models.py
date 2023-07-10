@@ -186,34 +186,6 @@ class Drivers(models.Model):
         db_table = "drivers"
 
 
-class Leagues(models.Model):
-    id = models.UUIDField(primary_key=True)
-
-    name = models.CharField(max_length=50, blank=True, null=True)
-
-    class Meta:
-        managed = False
-
-        db_table = "leagues"
-
-
-class LeaguesDrivers(models.Model):
-    id = models.UUIDField(primary_key=True)
-
-    is_reserve = models.BooleanField(blank=True, null=True)
-
-    driver = models.ForeignKey(Drivers, models.DO_NOTHING)
-
-    league = models.ForeignKey(Leagues, models.DO_NOTHING)
-
-    team = models.ForeignKey("Teams", models.DO_NOTHING)
-
-    class Meta:
-        managed = False
-
-        db_table = "leagues_drivers"
-
-
 class Races(models.Model):
     id = models.UUIDField(primary_key=True)
 
@@ -223,7 +195,7 @@ class Races(models.Model):
 
     track = models.ForeignKey("Tracks", models.DO_NOTHING)
 
-    league = models.ForeignKey(Leagues, models.DO_NOTHING)
+    season = models.ForeignKey("Seasons", models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -236,7 +208,7 @@ class RacesDrivers(models.Model):
 
     driver = models.ForeignKey(Drivers, models.DO_NOTHING)
 
-    race = models.ForeignKey(Races, models.DO_NOTHING)
+    race = models.ForeignKey(Races, models.CASCADE)
 
     team = models.ForeignKey("Teams", models.DO_NOTHING)
 
@@ -285,6 +257,34 @@ class Roles(models.Model):
         managed = False
 
         db_table = "roles"
+
+
+class Seasons(models.Model):
+    id = models.UUIDField(primary_key=True)
+
+    name = models.CharField(max_length=50, blank=True, null=True)
+
+    class Meta:
+        managed = False
+
+        db_table = "seasons"
+
+
+class SeasonsDrivers(models.Model):
+    id = models.UUIDField(primary_key=True)
+
+    is_reserve = models.BooleanField(blank=True, null=True)
+
+    driver = models.ForeignKey(Drivers, models.DO_NOTHING)
+
+    season = models.ForeignKey(Seasons, models.DO_NOTHING)
+
+    team = models.ForeignKey("Teams", models.DO_NOTHING)
+
+    class Meta:
+        managed = False
+
+        db_table = "seasons_drivers"
 
 
 class Teams(models.Model):

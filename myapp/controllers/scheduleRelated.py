@@ -1,6 +1,6 @@
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
-from ..models import Tracks, Teams, Drivers
+from ..models import Tracks, Teams, Drivers, Races
 import json
 from typing import TypedDict, List, Dict
 
@@ -11,7 +11,6 @@ class CreateSeasonParams(TypedDict):
 
 class SubmitTeamsDriversParams(TypedDict):
     teams: List[Dict[str, List[str]]]
-    seasonID: str
     # teams: {
     # teamID: string,
     # drivers: string[]
@@ -40,30 +39,6 @@ def getAllAvailableTracks():
 
     except Exception as e:
         print(e)
-        return HttpResponseBadRequest()
-
-
-# raw query pri insertoch preto, aby id generovala db a nie django (aspon myslim)
-def createSeason(params):
-    try:
-        data = {"seasonID": None}
-        with connection.cursor() as c:
-            c.execute(
-                """
-                INSERT INTO seasons (name)
-                VALUES (%s)
-                RETURNING id
-            """,
-                [params["name"]],
-            )
-
-            data["seasonID"] = str(c.fetchone()[0])
-
-        return HttpResponse(json.dumps(data), status=200)
-
-    except Exception as e:
-        print(e)
-
         return HttpResponseBadRequest()
 
 
@@ -113,7 +88,7 @@ def submitTeamsDrivers(data: SubmitTeamsDriversParams):
         return HttpResponseBadRequest()
 
 
-def postSchedule(params: PostScheduleParams):
+def postSchedule(params: PostScheduleParams, seasonID):
     try:
         result = {"races": []}
 
@@ -125,12 +100,39 @@ def postSchedule(params: PostScheduleParams):
                     VALUES (%s, %s, %s, 'random name')
                     RETURNING id
                     """,
-                    [row["timestamp"], row["trackID"], params["seasonID"]],
+                    [row["timestamp"], row["trackID"], seasonID],
                 )
 
                 result["races"].append(str(c.fetchone()[0]))
 
         return HttpResponse(json.dumps(result), status=200)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()
+
+
+def getSchedule(seasonID):
+    try:
+        schedule = Races.objects.filter(season_id=seasonID)
+        result = {"races": []}
+
+        for r in schedule:
+            result["races"].append(
+                {"id": str(r.id), "date": str(r.date), "trackID": str(r.track_id)}
+            )
+
+        return HttpResponse(json.dumps(result), status=200)
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()
+
+
+def deleteFromSchedule(raceID: str):
+    try:
+        Races.objects.get(id=raceID).delete()
+
+        return HttpResponse(status=204)
 
     except Exception as e:
         print(e)

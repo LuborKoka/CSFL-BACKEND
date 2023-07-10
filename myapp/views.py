@@ -14,11 +14,13 @@ from .controllers.report import reportUpload
 from .controllers.races import getRaces, getRaceDrivers
 from .controllers.scheduleRelated import (
     getAllAvailableTracks,
-    createSeason,
     fetchAllTeamsDrivers,
     submitTeamsDrivers,
     postSchedule,
+    getSchedule,
+    deleteFromSchedule,
 )
+from .controllers.seasons import createSeason, getSeasonSchedule, getAllSeasons
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -116,6 +118,15 @@ def fetchAllTracks(req: HttpRequest):
     return HttpResponseNotFound()
 
 
+# api/season-schedule/<str:season_id>/
+@csrf_exempt
+def season(req: HttpRequest, season_id: str):
+    if req.method == "GET":
+        return getSeasonSchedule(season_id)  # seasons.py
+
+    return HttpResponseNotFound()
+
+
 # api/admins/all-tracks/
 @csrf_exempt
 def createSeasonView(req: HttpRequest):
@@ -141,9 +152,15 @@ def fetchAllTeamsDriversView(req: HttpRequest):
 
 
 @csrf_exempt
-def schedule(req: HttpRequest):
+def schedule(req: HttpRequest, object_id: str):
+    if req.method == "GET":
+        return getSchedule(object_id)
+
     if req.method == "POST":
         data = json.loads(req.body)
-        return postSchedule(data["params"])
+        return postSchedule(data["params"], object_id)
+
+    if req.method == "DELETE":
+        return deleteFromSchedule(object_id)
 
     return HttpResponseNotFound()

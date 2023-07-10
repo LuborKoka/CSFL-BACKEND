@@ -28,10 +28,13 @@ urlpatterns = [
     path("api/upload-report/", views.uploadReport),  # report.py
     path("api/races/", views.fetchRaces),  # races.py
     path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),  # races.py
-    path("api/admins/create-season/", views.createSeasonView),  # scheduleRelated.py
+    path("api/season-schedule/<str:season_id>/", views.season),  # seasons.py
+    path("api/admins/create-season/", views.createSeasonView),  # seasons.py
     path("api/admins/all-tracks/", views.fetchAllTracks),  # scheduleRelated.py
     path(
         "api/admins/all-teams-and-drivers/", views.fetchAllTeamsDriversView
     ),  # scheduleRelated.py
-    path("api/admins/schedule/", views.schedule),  # scheduleRelated.py
+    path(
+        "api/admins/schedule/<str:object_id>/", views.schedule
+    ),  # scheduleRelated.py; object_id je season_id, pre delete metodu je to race.id, ktora bude vymazana
 ]
