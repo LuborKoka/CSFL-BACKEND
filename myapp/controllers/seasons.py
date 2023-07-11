@@ -61,5 +61,4 @@ def getAllSeasons():
     except Exception as e:
         print(e)
 
-    print(result)  # this prints the expected values
-    return result
+    return HttpResponse(json.dumps(result), status=200)

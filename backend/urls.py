@@ -26,8 +26,11 @@ urlpatterns = [
     path("api/login/", views.signin),  # authentication.py
     path("api/change-password/", views.changePasswordEndpoint),  # authentication.py
     path("api/upload-report/", views.uploadReport),  # report.py
-    path("api/races/", views.fetchRaces),  # races.py
+    path(
+        "api/races/", views.fetchRaces
+    ),  # races.py; v races.py mam este nejake upravy na plane po zmene db
     path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),  # races.py
+    path("api/seasons/", views.seasons),
     path("api/season-schedule/<str:season_id>/", views.season),  # seasons.py
     path("api/admins/create-season/", views.createSeasonView),  # seasons.py
     path("api/admins/all-tracks/", views.fetchAllTracks),  # scheduleRelated.py
@@ -35,6 +38,8 @@ urlpatterns = [
         "api/admins/all-teams-and-drivers/", views.fetchAllTeamsDriversView
     ),  # scheduleRelated.py
     path(
-        "api/admins/schedule/<str:object_id>/", views.schedule
+        "api/admins/schedule/<str:object_id>/",
+        views.schedule
+        # vytvorenie pretekov sezony, ziskanie jej pretekov, uprava a vymazanie
     ),  # scheduleRelated.py; object_id je season_id, pre delete metodu je to race.id, ktora bude vymazana
 ]

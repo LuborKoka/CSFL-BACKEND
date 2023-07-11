@@ -7,7 +7,6 @@ import json
 from ..models import Users, Drivers, Seasons
 from uuid import UUID
 import time
-from .seasons import getAllSeasons
 
 # chyba porobit role a ukladanie tokenov do prihlaseni
 
@@ -94,13 +93,8 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             "id": str(user[0]),
         }
         token = jwt.encode(payload=payload, key=SECRET_KEY)
-        seasons = getAllSeasons()
-        response = json.dumps(
-            {
-                "token": token,
-                "seasons": seasons["seasons"],
-            }
-        )
+
+        response = json.dumps({"token": token})
         return HttpResponse(response, content_type="application/json", status=201)
     except Exception as e:
         print(e)
@@ -135,14 +129,8 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
             "id": str(user["id"]),
         }
         token = jwt.encode(payload=payload, key=SECRET_KEY)
-        seasons = getAllSeasons()   #there is an error right around here
-        # 
-        response = json.dumps(
-            {
-                "token": token,
-                "seasons": seasons["seasons"],
-            }
-        )
+
+        response = json.dumps({"token": token})
         return HttpResponse(response, status=200)
 
     return HttpResponseBadRequest(json.dumps({"data": "Bad Credentials"}))

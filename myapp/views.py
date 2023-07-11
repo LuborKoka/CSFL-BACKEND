@@ -127,6 +127,12 @@ def season(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
+@csrf_exempt
+def seasons(req: HttpRequest):
+    if req.method == "GET":
+        return getAllSeasons()
+
+
 # api/admins/all-tracks/
 @csrf_exempt
 def createSeasonView(req: HttpRequest):
