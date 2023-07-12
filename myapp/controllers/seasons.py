@@ -34,7 +34,6 @@ def getSeasonSchedule(seasonID: str):
         result = {"races": []}
 
         for race in races:
-            print(race)
             result["races"].append(
                 {
                     "raceID": str(race.id),

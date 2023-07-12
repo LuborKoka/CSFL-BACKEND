@@ -208,9 +208,13 @@ class RacesDrivers(models.Model):
 
     driver = models.ForeignKey(Drivers, models.DO_NOTHING)
 
-    race = models.ForeignKey(Races, models.CASCADE)
+    race = models.ForeignKey(Races, models.DO_NOTHING)
 
     team = models.ForeignKey("Teams", models.DO_NOTHING)
+
+    time = models.IntegerField(blank=True, null=True)
+
+    has_fastest_lap = models.BooleanField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -279,7 +283,7 @@ class SeasonsDrivers(models.Model):
 
     season = models.ForeignKey(Seasons, models.DO_NOTHING)
 
-    team = models.ForeignKey("Teams", models.DO_NOTHING)
+    team = models.ForeignKey("Teams", models.DO_NOTHING, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -293,6 +297,8 @@ class Teams(models.Model):
     name = models.CharField(unique=True, max_length=100)
 
     icon = models.BinaryField(blank=True, null=True)
+
+    color = models.CharField(max_length=7, blank=True, null=True)
 
     class Meta:
         managed = False

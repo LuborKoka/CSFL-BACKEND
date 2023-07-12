@@ -1,6 +1,6 @@
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
-from ..models import Tracks, Teams, Drivers, Races
+from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers
 import json
 from typing import TypedDict, List, Dict
 
@@ -42,15 +42,21 @@ def getAllAvailableTracks():
         return HttpResponseBadRequest()
 
 
-def fetchAllTeamsDrivers():
+def fetchAllTeamsDrivers(seasonID: str):
     try:
         teams = Teams.objects.all()
         drivers = Drivers.objects.all()
+        signed = SeasonsDrivers.objects.filter(season_id=seasonID)
 
         data = {"teams": [], "drivers": []}
 
         for t in teams:
-            data["teams"].append({"id": str(t.id), "name": t.name})
+            team = {"id": str(t.id), "name": t.name, "signed": []}
+
+            for s in signed:
+                if s.team_id == t.id:
+                    team["signed"].append(str(s.driver_id))
+            data["teams"].append(team)
 
         for d in drivers:
             data["drivers"].append({"id": str(d.id), "name": d.name})
