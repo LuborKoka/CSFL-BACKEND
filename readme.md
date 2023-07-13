@@ -45,9 +45,9 @@ ORDER BY points_total DESC, driver_name, date
 Bude sem treba doplnit sprinty a penalizacie of FIA. Niekde do CTE results snad.  
 Stlpec time by mal znamenat nasledovne:
 
-> null -> DNS
-> 0 -> DNF
-> -N -> N kol pozadu
+> null -> DNS  
+> 0 -> DNF  
+> -N -> N kol pozadu  
 > Predbezne. Bude to mierne jebat vypocet poradia a bodov, prinajhorsom si dorobim dalsi stlpec.
 
 Druha query pre poradie v pohari konstrukterov
