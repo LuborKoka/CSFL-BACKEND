@@ -86,7 +86,7 @@ team_points AS (
 	SELECT DISTINCT ON(team_id) *, SUM(points) OVER (PARTITION BY team_id)
 	FROM points
 )
-SELECT team_id, color, sum AS points, ROW_NUMBER() OVER (ORDER BY sum DESC) AS rank
+SELECT team_id, color, sum AS points, name, ROW_NUMBER() OVER (ORDER BY sum DESC) AS rank
 FROM team_points
 ORDER BY sum DESC
 
