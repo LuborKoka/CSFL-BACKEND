@@ -45,4 +45,7 @@ urlpatterns = [
     ),  # scheduleRelated.py; object_id je season_id, pre delete metodu je to race.id, ktora bude vymazana
     path("api/admins/edit-race/<str:race_id>/drivers/", views.editRaceDrivers),
     path("api/admins/edit-race/<str:race_id>/results/", views.editRaceResults),
+    path("api/race/<str:race_id>/results/", views.raceResults),
+    path("api/seasons/<str:season_id>/standings/", views.standings),
+    path("api/images/tracks/<str:track_id>/", views.raceImage),
 ]

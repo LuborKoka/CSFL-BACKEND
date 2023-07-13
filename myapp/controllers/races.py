@@ -198,3 +198,33 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+
+
+def getRaceResults(raceID: str):
+    try:
+        drivers = (
+            RacesDrivers.objects.filter(race_id=raceID)
+            .select_related("driver", "team")
+            .order_by("time")
+        )
+
+        results = {"results": []}
+
+        rank = 1
+        for d in drivers:
+            results["results"].append(
+                {
+                    "driverID": str(d.driver.id),
+                    "driverName": d.driver.name,
+                    "time": d.time,
+                    "teamName": d.team.name,
+                    "rank": rank,
+                }
+            )
+            rank += 1
+
+        return HttpResponse(json.dumps(results), status=200)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()

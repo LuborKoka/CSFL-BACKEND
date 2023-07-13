@@ -3,7 +3,6 @@ from django.http import JsonResponse, HttpResponse, HttpRequest, HttpResponseNot
 from django.db import connection
 from django.views.decorators.csrf import csrf_exempt
 import json
-from .models import Users
 from .controllers.authentication import (
     userSignUp,
     userLogIn,
@@ -18,6 +17,7 @@ from .controllers.races import (
     postEditRaceDrivers,
     getEditRaceResults,
     postEditRaceResults,
+    getRaceResults,
 )
 from .controllers.scheduleRelated import (
     getAllAvailableTracks,
@@ -28,6 +28,8 @@ from .controllers.scheduleRelated import (
     deleteFromSchedule,
 )
 from .controllers.seasons import createSeason, getSeasonSchedule, getAllSeasons
+from .controllers.standings import getStandings
+from .controllers.images import raceImage as getRaceImage
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -165,6 +167,15 @@ def fetchAllTeamsDriversView(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
+# api/race/results/<str:race_id>/
+@csrf_exempt
+def raceResults(req: HttpRequest, race_id: str):
+    if req.method == "GET":
+        return getRaceResults(race_id)
+
+    return HttpResponseNotFound()
+
+
 # api/admins/edit-race/drivers/<str:race_id>/
 @csrf_exempt
 def editRaceDrivers(req: HttpRequest, race_id: str):
@@ -201,5 +212,21 @@ def schedule(req: HttpRequest, object_id: str):
 
     if req.method == "DELETE":
         return deleteFromSchedule(object_id)
+
+    return HttpResponseNotFound()
+
+
+# api/seasons/<str:season_id>/standings/
+def standings(req: HttpRequest, season_id: str):
+    if req.method == "GET":
+        return getStandings(season_id)
+
+    return HttpResponseNotFound()
+
+
+# api/images/race/<str:track_id>/
+def raceImage(req: HttpRequest, track_id: str):
+    if req.method == "GET":
+        return getRaceImage(track_id)
 
     return HttpResponseNotFound()
