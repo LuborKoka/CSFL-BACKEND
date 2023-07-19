@@ -120,7 +120,7 @@ def postSchedule(params: PostScheduleParams, seasonID):
 
 def getSchedule(seasonID):
     try:
-        schedule = Races.objects.filter(season_id=seasonID)
+        schedule = Races.objects.filter(season_id=seasonID).order_by("date")
         result = {"races": []}
 
         for r in schedule:
