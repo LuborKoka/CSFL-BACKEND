@@ -30,7 +30,11 @@ def createSeason(params):
 
 def getSeasonSchedule(seasonID: str):
     try:
-        races = Races.objects.filter(season_id=seasonID).select_related("track")
+        races = (
+            Races.objects.filter(season_id=seasonID)
+            .select_related("track")
+            .order_by("date")
+        )
         result = {"races": []}
 
         for race in races:

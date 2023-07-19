@@ -9,7 +9,7 @@ from .controllers.authentication import (
     changeUserRole,
     changePassword,
 )
-from .controllers.report import reportUpload
+from .controllers.report import reportUpload, getReports, postReportResponse
 from .controllers.races import (
     getRaces,
     getRaceDrivers,
@@ -27,9 +27,10 @@ from .controllers.scheduleRelated import (
     getSchedule,
     deleteFromSchedule,
 )
+from .controllers.verdict import postVerdict, getConcernedDrivers
 from .controllers.seasons import createSeason, getSeasonSchedule, getAllSeasons
 from .controllers.standings import getStandings
-from .controllers.images import raceImage as getRaceImage
+from .controllers.media import raceImage as getRaceImage, reportVideo
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -97,12 +98,40 @@ def changePasswordEndpoint(req: HttpRequest):
     return HttpResponseNotFound()
 
 
-@csrf_exempt  # api/upload-report/
-def uploadReport(req: HttpRequest):
-    if req.method == "POST":
-        reportUpload(req.FILES.items(), dict(req.POST.items())["report"])
+@csrf_exempt  # api/races/<str:race_id>/report/
+def report(req: HttpRequest, race_id: str):
+    if req.method == "GET":
+        return getReports(race_id)
 
-    return HttpResponse(status=200)
+    if req.method == "POST":
+        return reportUpload(
+            req.FILES.items(), dict(req.POST.items())["report"], race_id
+        )
+
+    return HttpResponseNotFound()
+
+
+@csrf_exempt
+def reportResponse(req: HttpRequest, report_id: str):
+    if req.method == "POST":
+        return postReportResponse(
+            req.FILES.items(), report_id, json.loads(dict(req.POST.items())["data"])
+        )
+
+    return HttpResponseNotFound()
+
+
+# api/report/<str:report_id>/verdict/
+@csrf_exempt
+def reportVerdict(req: HttpRequest, report_id: str):
+    if req.method == "GET":
+        return getConcernedDrivers(report_id)
+
+    if req.method == "POST":
+        data = json.loads(req.body)["params"]
+        return postVerdict(report_id, data)
+
+    return HttpResponseNotFound()
 
 
 @csrf_exempt  # api/races/
@@ -167,7 +196,7 @@ def fetchAllTeamsDriversView(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
-# api/race/results/<str:race_id>/
+# api/race/<str:race_id>/results/
 @csrf_exempt
 def raceResults(req: HttpRequest, race_id: str):
     if req.method == "GET":
@@ -225,8 +254,18 @@ def standings(req: HttpRequest, season_id: str):
 
 
 # api/images/race/<str:track_id>/
+@csrf_exempt
 def raceImage(req: HttpRequest, track_id: str):
     if req.method == "GET":
         return getRaceImage(track_id)
+
+    return HttpResponseNotFound()
+
+
+# api/videos/report/<str:name>/
+@csrf_exempt
+def reportVideoView(req: HttpRequest, name: str):
+    if req.method == "GET":
+        return reportVideo(name)
 
     return HttpResponseNotFound()

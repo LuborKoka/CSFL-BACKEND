@@ -25,11 +25,15 @@ urlpatterns = [
     path("api/signup/", views.signup),  # authentication.py
     path("api/login/", views.signin),  # authentication.py
     path("api/change-password/", views.changePasswordEndpoint),  # authentication.py
-    path("api/upload-report/", views.uploadReport),  # report.py
     path(
         "api/races/", views.fetchRaces
-    ),  # races.py; v races.py mam este nejake upravy na plane po zmene db
+    ),  # races.py; v races.py mam este nejake upravy na plane po zmene db -- ale keby si sem dopisem, ze ako do pitchi
     path("api/races/<str:race_id>/drivers/", views.fetchRaceDrivers),  # races.py
+    path("api/races/<str:race_id>/results/", views.raceResults),
+    path("api/races/<str:race_id>/reports/", views.report),  # report.py
+    path("api/report/<str:report_id>/response/", views.reportResponse),
+    path("api/report/<str:report_id>/verdict/", views.reportVerdict),
+    path("api/videos/report/<str:name>/", views.reportVideoView),
     path("api/seasons/", views.seasons),  # seasons.py
     path("api/season-schedule/<str:season_id>/", views.season),  # seasons.py
     path("api/admins/create-season/", views.createSeasonView),  # seasons.py
@@ -45,7 +49,6 @@ urlpatterns = [
     ),  # scheduleRelated.py; object_id je season_id, pre delete metodu je to race.id, ktora bude vymazana
     path("api/admins/edit-race/<str:race_id>/drivers/", views.editRaceDrivers),
     path("api/admins/edit-race/<str:race_id>/results/", views.editRaceResults),
-    path("api/race/<str:race_id>/results/", views.raceResults),
     path("api/seasons/<str:season_id>/standings/", views.standings),
     path("api/images/tracks/<str:track_id>/", views.raceImage),
 ]

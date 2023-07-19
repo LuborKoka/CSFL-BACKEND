@@ -186,6 +186,25 @@ class Drivers(models.Model):
         db_table = "drivers"
 
 
+class Penalties(models.Model):
+    id = models.UUIDField(primary_key=True)
+
+    time = models.IntegerField(blank=True, null=True)
+
+    penalty_points = models.IntegerField(blank=True, null=True)
+
+    issued_at = models.DateTimeField(blank=True, null=True)
+
+    driver = models.ForeignKey(Drivers, models.DO_NOTHING)
+
+    report = models.ForeignKey("Reports", models.DO_NOTHING)
+
+    class Meta:
+        managed = False
+
+        db_table = "penalties"
+
+
 class Races(models.Model):
     id = models.UUIDField(primary_key=True)
 
@@ -212,9 +231,9 @@ class RacesDrivers(models.Model):
 
     team = models.ForeignKey("Teams", models.DO_NOTHING)
 
-    time = models.IntegerField(blank=True, null=True)
-
     has_fastest_lap = models.BooleanField(blank=True, null=True)
+
+    time = models.FloatField(blank=True, null=True)
 
     class Meta:
         managed = False
@@ -222,10 +241,31 @@ class RacesDrivers(models.Model):
         db_table = "races_drivers"
 
 
+class ReportResponses(models.Model):
+    id = models.UUIDField(primary_key=True)
+
+    content = models.TextField()
+
+    video_path = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(blank=True, null=True)
+
+    from_driver = models.ForeignKey(
+        Drivers, models.DO_NOTHING, db_column="from_driver", blank=True, null=True
+    )
+
+    report = models.ForeignKey("Reports", models.DO_NOTHING, blank=True, null=True)
+
+    class Meta:
+        managed = False
+
+        db_table = "report_responses"
+
+
 class ReportTargets(models.Model):
     id = models.UUIDField(primary_key=True)
 
-    driver = models.ForeignKey(Drivers, models.DO_NOTHING)
+    driver = models.ForeignKey(Drivers, models.DO_NOTHING, blank=True, null=True)
 
     report = models.ForeignKey("Reports", models.DO_NOTHING)
 
@@ -240,11 +280,15 @@ class Reports(models.Model):
 
     content = models.TextField()
 
-    video_path = models.TextField()
+    video_path = models.TextField(blank=True, null=True)
 
     from_driver = models.ForeignKey(Drivers, models.DO_NOTHING, db_column="from_driver")
 
     race = models.ForeignKey(Races, models.DO_NOTHING)
+
+    created_at = models.DateTimeField(blank=True, null=True)
+
+    verdict = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
