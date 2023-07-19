@@ -6,17 +6,32 @@ import base64
 
 
 def getStandings(seasonID: str):
+    # treba pridat penalizacie
+
     try:
         with connection.cursor() as c:
             # pohar jazdcov
             c.execute(
                 """
-                    WITH results AS (
-                        SELECT rd.driver_id, rd.race_id, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
-                        FROM races_drivers AS rd
-                        JOIN races AS r ON rd.race_id = r.id
-                        WHERE season_id = %s
-                        ORDER BY r.date
+                    WITH total_pents AS (
+                        SELECT DISTINCT ON(pents.driver_id, pents.race_id) driver_id, race_id, SUM(time) OVER (PARTITION BY driver_id, race_id)
+                            FROM (
+                                SELECT * 
+                                FROM penalties AS p 
+                                JOIN reports AS r ON p.report_id = r.id
+                            ) AS pents
+                            ORDER BY driver_id, race_id
+                    ),
+                    results AS (
+                        SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
+                        FROM (
+                            SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time
+                            FROM races_drivers AS rd
+                            JOIN races AS r ON rd.race_id = r.id
+                            LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
+                            WHERE season_id = %s
+                            ORDER BY r.date
+                        ) AS results_with_pents
                     ),
                     res_with_points AS (
                         SELECT d.id AS driver_id, d.name AS driver_name, sd.is_reserve, tr.flag, t.name AS team_name, rd.time, rd.has_fastest_lap, re.rank, r.date,
@@ -92,16 +107,29 @@ def getStandings(seasonID: str):
             # pohar konstrukterov
             c.execute(
                 """
-                    WITH ranks AS (
-                        SELECT team_id, t.name, t.color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC)
-                        FROM races_drivers AS rd
-                        JOIN races AS r ON rd.race_id = r.id
-                        JOIN teams AS t ON rd.team_id = t.id
-                        WHERE r.season_id = '8e7881cb-4284-4af9-b5e4-66ea822a77e0'
-                        ORDER BY date, time
+                    WITH total_pents AS (
+                        SELECT DISTINCT ON(pents.driver_id, pents.race_id) driver_id, race_id, SUM(time) OVER (PARTITION BY driver_id, race_id)
+                            FROM (
+                                SELECT * 
+                                FROM penalties AS p 
+                                JOIN reports AS r ON p.report_id = r.id
+                            ) AS pents
+                            ORDER BY driver_id, race_id
+                    ),
+                    ranks AS (
+                        SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC)
+                        FROM (
+                            SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id
+                            FROM races_drivers AS rd
+                            JOIN races AS r ON rd.race_id = r.id
+                            JOIN teams AS t ON rd.team_id = t.id
+                            LEFT JOIN total_pents AS tp ON rd.driver_id = tp.driver_id AND rd.race_id = tp.race_id
+                            WHERE r.season_id = %s
+                            ORDER BY date, time
+                        ) ranks_with_pents
                     ),
                     points AS (
-                        SELECT *, 
+                        SELECT *,
                             CASE
                                 WHEN rank = 1 THEN 25
                                 WHEN rank = 2 THEN 18
@@ -119,7 +147,7 @@ def getStandings(seasonID: str):
                                 WHEN has_fastest_lap = TRUE AND rank <= 10 THEN 1
                                 ELSE 0
                             END AS points
-                        FROM ranks 
+                        FROM ranks
                     ),
                     team_points AS (
                         SELECT DISTINCT ON(team_id) *, SUM(points) OVER (PARTITION BY team_id)
@@ -128,8 +156,8 @@ def getStandings(seasonID: str):
                     SELECT team_id, color, sum AS points, name, ROW_NUMBER() OVER (ORDER BY sum DESC) AS rank
                     FROM team_points
                     ORDER BY sum DESC
-
-                """
+                """,
+                [seasonID],
             )
             teams = c.fetchall()
 

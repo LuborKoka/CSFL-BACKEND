@@ -155,7 +155,7 @@ def getEditRaceResults(raceID: str):
         return HttpResponseBadRequest()
 
 
-# bude treba aj sprinty doriesit pravdepodobne
+# bude treba aj sprinty doriesit
 def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
     leader = {
         "id": params["results"]["leader"]["id"],
@@ -201,27 +201,54 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
 
 
 def getRaceResults(raceID: str):
+    # doriesit preteky, ktore maju supisku ale nemaju este zapisane vysledky, kazdemu jebne vitazsvo
+
+    c = connection.cursor()
     try:
-        drivers = (
-            RacesDrivers.objects.filter(race_id=raceID)
-            .select_related("driver", "team")
-            .order_by("time")
+        c.execute(
+            """
+                WITH time_penalties AS (
+                    SELECT DISTINCT ON (driver_id) SUM(time) OVER (PARTITION BY driver_id) AS time, driver_id, report_id, race_id
+                    FROM races AS r 
+                    JOIN reports AS re ON r.id = re.race_id
+                    JOIN penalties AS p ON p.report_id = re.id
+                    WHERE r.id = %s
+					ORDER BY driver_id
+                ),
+                result_times AS (
+                    SELECT r.id AS race_id, d.id, d.name, rd.time + COALESCE(tp.time, 0) AS result_time, has_fastest_lap, t.name AS team_name
+                    FROM races AS r
+                    JOIN races_drivers AS rd ON r.id = rd.race_id
+                    LEFT JOIN time_penalties AS tp ON tp.driver_id = rd.driver_id
+                    JOIN drivers AS d ON d.id = rd.driver_id
+                    JOIN teams AS t ON t.id = rd.team_id
+                    WHERE r.id = %s
+                    ORDER BY result_time
+                )
+
+                SELECT id, name, result_time, RANK() OVER (PARTITION BY rt.race_id ORDER BY result_time ASC), has_fastest_lap, team_name
+                FROM result_times AS rt
+                ORDER BY result_time ASC
+            """,
+            [raceID, raceID],
         )
+
+        # [0: driver_id, 1: driver_name, 2: result_time, 3: rank, 4: has_fastest_lap, 5: team_name]
+        drivers = c.fetchall()
 
         results = {"results": []}
 
-        rank = 1
         for d in drivers:
             results["results"].append(
                 {
-                    "driverID": str(d.driver.id),
-                    "driverName": d.driver.name,
-                    "time": d.time,
-                    "teamName": d.team.name,
-                    "rank": rank,
+                    "driverID": str(d[0]),
+                    "driverName": d[1],
+                    "time": d[2],
+                    "teamName": d[5],
+                    "rank": d[3],
+                    "hasFastestLap": d[4],
                 }
             )
-            rank += 1
 
         return HttpResponse(json.dumps(results), status=200)
 
