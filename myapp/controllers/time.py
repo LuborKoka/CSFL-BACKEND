@@ -2,8 +2,6 @@ import re
 
 
 def gap_to_time(time: float, gap: str) -> float:
-    print(time)
-    print("gap: ", gap)
     """
     Adds a time gap to a given time.
 
