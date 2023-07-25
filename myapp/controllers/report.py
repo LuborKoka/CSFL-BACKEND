@@ -30,8 +30,8 @@ class ReportResponse(TypedDict):
 def reportUpload(
     files: ItemsView[str, InMemoryUploadedFile], form: FormData, raceID: str
 ):
-    # if datum neni medzi zaciatkom koncom, 
-    
+    # if datum neni medzi zaciatkom koncom,
+
     form = json.loads(form)
     video_paths = []
 
@@ -101,8 +101,9 @@ def getReports(raceID: str):
                     queryset=ReportResponses.objects.select_related("from_driver"),
                 )
             )
+            .order_by("created_at")
         )
-
+        rank = 1
         for r in reports:
             videos = processVideoPath(r.video_path)
 
@@ -157,8 +158,10 @@ def getReports(raceID: str):
                     "responses": responses,
                     "verdict": r.verdict,
                     "penalties": penalties,
+                    "rank": rank,
                 }
             )
+            rank += 1
 
         return HttpResponse(json.dumps(result), status=200)
 
@@ -258,6 +261,9 @@ def getEmbedUrl(url: str):
     elif "medal.tv" in parsed_url.netloc:
         embeddable_url = url.replace("clips", "clip")
         return {"url": embeddable_url, "embed": True}
+
+    elif "outplayed.tv" in parsed_url.netloc:
+        return {"url": url, "embed": True}
 
     # If the video id was not found, return the original url
     return {"url": url, "embed": False}

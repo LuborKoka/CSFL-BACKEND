@@ -49,16 +49,16 @@ def getRaces():
 
 def getRaceDrivers(id: str):
     try:
-        drivers = (
-            RacesDrivers.objects.filter(race=id)
-            .select_related("driver")
-            .values("driver", "driver__name")
-        )
+        drivers = RacesDrivers.objects.filter(race=id).select_related("driver")
 
-        data = {"drivers": []}
+        data = {"drivers": [], "raceName": ""}
 
         for d in drivers:
-            data["drivers"].append({"id": str(d["driver"]), "name": d["driver__name"]})
+            data["drivers"].append({"id": str(d.driver.id), "name": d.driver.name})
+
+        race = Races.objects.select_related("track").get(id=id)
+
+        data["raceName"] = race.track.race_name
 
         return HttpResponse(json.dumps(data), status=200)
 

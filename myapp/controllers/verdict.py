@@ -72,3 +72,53 @@ def postVerdict(reportID: str, params: NewVerdict):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+
+
+def getRaceReportsFIAVersion(raceID: str):
+    try:
+        reports = (
+            Reports.objects.filter(race_id=raceID)
+            .select_related("from_driver", "race")
+            .prefetch_related(
+                Prefetch(
+                    "reporttargets_set",
+                    queryset=ReportTargets.objects.select_related("driver"),
+                )
+            )
+            .order_by("created_at")
+        )
+
+        result = {
+            "reports": [],
+            "raceName": reports[0].race.track.race_name,
+        }
+
+        rank = 1
+        for r in reports:
+            drivers = []
+
+            for rt in r.reporttargets_set.all():
+                drivers.append(
+                    {"driverID": str(rt.driver.id), "driverName": rt.driver.name}
+                )
+
+            if r.verdict == None:
+                result["reports"].append(
+                    {
+                        "reportID": str(r.id),
+                        "targets": drivers,
+                        "rank": rank,
+                        "fromDriver": {
+                            "id": str(r.from_driver.id),
+                            "name": r.from_driver.name,
+                        },
+                    }
+                )
+
+            rank += 1
+
+        return HttpResponse(json.dumps(result), status=200)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()

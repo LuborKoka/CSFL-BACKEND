@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/races/<str:race_id>/reports/", views.report),  # report.py
     path("api/report/<str:report_id>/response/", views.reportResponse),
     path("api/report/<str:report_id>/verdict/", views.reportVerdict),
+    path("api/fia/<str:race_id>/drivers/", views.raceReportsFIA),
     path("api/videos/report/<str:name>/", views.reportVideoView),
     path("api/seasons/", views.seasons),  # seasons.py
     path("api/season-schedule/<str:season_id>/", views.season),  # seasons.py

@@ -27,7 +27,11 @@ from .controllers.scheduleRelated import (
     getSchedule,
     deleteFromSchedule,
 )
-from .controllers.verdict import postVerdict, getConcernedDrivers
+from .controllers.verdict import (
+    postVerdict,
+    getConcernedDrivers,
+    getRaceReportsFIAVersion,
+)
 from .controllers.seasons import createSeason, getSeasonSchedule, getAllSeasons
 from .controllers.standings import getStandings
 from .controllers.media import raceImage as getRaceImage, reportVideo
@@ -130,6 +134,13 @@ def reportVerdict(req: HttpRequest, report_id: str):
     if req.method == "POST":
         data = json.loads(req.body)["params"]
         return postVerdict(report_id, data)
+
+    return HttpResponseNotFound()
+
+
+def raceReportsFIA(req: HttpRequest, race_id: str):
+    if req.method == "GET":
+        return getRaceReportsFIAVersion(race_id)
 
     return HttpResponseNotFound()
 
