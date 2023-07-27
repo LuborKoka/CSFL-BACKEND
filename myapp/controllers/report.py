@@ -9,6 +9,8 @@ from typing import TypedDict, List
 import json
 from ..models import Reports, ReportTargets, ReportResponses, Penalties
 from urllib.parse import urlparse, parse_qs
+import imghdr
+import os
 
 FILE_PATH = os.path.join(PATH, "media\\")
 FILE_PATH_DELIM = "++"
@@ -55,7 +57,7 @@ def reportUpload(
             id = c.fetchone()[0]
 
             for t in form["targets"]:
-                data = [t, id]
+                data = [None if t == "hra" else t, id]
                 c.execute(
                     """
                     INSERT INTO report_targets (driver_id, report_id)
@@ -105,7 +107,7 @@ def getReports(raceID: str):
         )
         rank = 1
         for r in reports:
-            videos = processVideoPath(r.video_path)
+            videos = processMediaPath(r.video_path)
 
             responses = []
 
@@ -127,7 +129,7 @@ def getReports(raceID: str):
                 responses.append(
                     {
                         "id": str(re.id),
-                        "videos": processVideoPath(re.video_path),
+                        "videos": processMediaPath(re.video_path),
                         "content": re.content,
                         "createdAt": str(re.created_at),
                         "driverID": str(re.from_driver.id),
@@ -142,7 +144,12 @@ def getReports(raceID: str):
             targets = []
 
             for t in target_drivers:
-                targets.append({"id": str(t.driver.id), "name": t.driver.name})
+                targets.append(
+                    {
+                        "id": "hra" if t.driver == None else str(t.driver.id),
+                        "name": "Hra" if t.driver == None else t.driver.name,
+                    }
+                )
 
             result["reports"].append(
                 {
@@ -214,14 +221,27 @@ def postReportResponse(
         return HttpResponseBadRequest()
 
 
-def processVideoPath(video_string: str):
+def processMediaPath(video_string: str):
     paths = video_string.split(FILE_PATH_DELIM)
 
     videos = {"local": [], "online": []}
 
     for p in paths:
         if PATH in p:
-            videos["local"].append(p.replace(FILE_PATH, ""))
+            if not os.path.isfile(
+                p
+            ):  # ked neexistuje file, dam to ako image a zobrazi sa alt file not found hotovo
+                videos["local"].append(
+                    {"isImage": True, "url": p.replace(FILE_PATH, "")}
+                )
+                continue
+
+            if imghdr.what(p) is not None:
+                videos["local"].append(
+                    {"isImage": True, "url": p.replace(FILE_PATH, "")}
+                )
+                continue
+            videos["local"].append({"isImage": False, "url": p.replace(FILE_PATH, "")})
         else:
             videos["online"].append(getEmbedUrl(p))
 
@@ -267,6 +287,3 @@ def getEmbedUrl(url: str):
 
     # If the video id was not found, return the original url
     return {"url": url, "embed": False}
-
-
-print(getEmbedUrl("https://www.youtube.com/watch?v=Qr13uR-Nxyc&ab_channel=TheVision"))

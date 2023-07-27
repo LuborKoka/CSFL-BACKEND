@@ -19,7 +19,7 @@ def raceImage(trackID: str):
         return HttpResponseBadRequest()
 
 
-def reportVideo(name: str):
+def media(name: str):
     video_path = FILE_PATH + name  # Replace with the actual video path
 
     response = FileResponse(open(video_path, "rb"))

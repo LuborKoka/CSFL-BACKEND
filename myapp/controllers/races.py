@@ -1,4 +1,9 @@
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+)
 from django.db import connection
 from ..models import Races, RacesDrivers, SeasonsDrivers, Drivers, Tracks, Teams
 import json
@@ -23,6 +28,7 @@ class DriverResult(TypedDict):
 class Results(TypedDict):
     leader: DriverResult
     otherDrivers: List[DriverResult]
+    fastestLap: str
 
 
 class PostRaceResultsParams(TypedDict):
@@ -74,9 +80,9 @@ def getEditRace(raceID: str):
 
         teams = Teams.objects.all()
 
-        reservePilot = SeasonsDrivers.objects.filter(is_reserve=True).select_related(
-            "driver"
-        )
+        reservePilot = SeasonsDrivers.objects.filter(
+            is_reserve=True, season_id=race.season.id
+        ).select_related("driver")
 
         altTeams = []
 
@@ -90,7 +96,12 @@ def getEditRace(raceID: str):
                 season_id=race.season_id, team_id=t.id
             ).select_related("driver")
 
-            team = {"teamID": str(t.id), "teamName": t.name, "drivers": []}
+            team = {
+                "teamID": str(t.id),
+                "teamName": t.name,
+                "drivers": [],
+                "color": t.color,
+            }
 
             for d in drivers:
                 team["drivers"].append({"id": str(d.driver.id), "name": d.driver.name})
@@ -112,6 +123,14 @@ def getEditRace(raceID: str):
 
 
 def postEditRaceDrivers(raceID: str, params: RaceDriversParams):
+    try:
+        raceDrivers = RacesDrivers.objects.filter(race_id=raceID)
+        raceDrivers.delete()
+
+    except Exception as e:
+        print(e)
+        return HttpResponseServerError()
+
     data = []
 
     for t in params["teams"]:
@@ -157,10 +176,13 @@ def getEditRaceResults(raceID: str):
 
 # bude treba aj sprinty doriesit
 def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
+    # prepocet casu vitaza na sekundy
     leader = {
         "id": params["results"]["leader"]["id"],
         "time": time_to_seconds(params["results"]["leader"]["time"]),
     }
+
+    # zapis vitaza pretekov
     try:
         with connection.cursor() as c:
             c.execute(
@@ -178,7 +200,6 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
         print(e)
         return HttpResponseNotFound()
 
-        1
     data = []
     for d in params["results"]["otherDrivers"]:
         data.append([gap_to_time(leader["time"], d["time"]), raceID, d["id"]])
@@ -193,7 +214,13 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
                 data,
             )
 
-        return HttpResponse(status=200)
+        driver = RacesDrivers.objects.get(
+            driver_id=params["results"]["fastestLap"], race_id=raceID
+        )
+        driver.has_fastest_lap = True
+        driver.save()
+
+        return HttpResponse(status=204)
 
     except Exception as e:
         print(e)
@@ -216,7 +243,7 @@ def getRaceResults(raceID: str):
 					ORDER BY driver_id
                 ),
                 result_times AS (
-                    SELECT r.id AS race_id, d.id, d.name, rd.time + COALESCE(tp.time, 0) AS result_time, has_fastest_lap, t.name AS team_name
+                    SELECT r.id AS race_id, d.id, d.name, rd.time + COALESCE(tp.time, 0) AS result_time, has_fastest_lap, t.name AS team_name, r.is_sprint
                     FROM races AS r
                     JOIN races_drivers AS rd ON r.id = rd.race_id
                     LEFT JOIN time_penalties AS tp ON tp.driver_id = rd.driver_id
@@ -226,14 +253,14 @@ def getRaceResults(raceID: str):
                     ORDER BY result_time
                 )
 
-                SELECT id, name, result_time, RANK() OVER (PARTITION BY rt.race_id ORDER BY result_time ASC), has_fastest_lap, team_name
+                SELECT id, name, result_time, ROW_NUMBER() OVER (PARTITION BY rt.race_id ORDER BY result_time ASC), has_fastest_lap, team_name, is_sprint
                 FROM result_times AS rt
                 ORDER BY result_time ASC
             """,
             [raceID, raceID],
         )
 
-        # [0: driver_id, 1: driver_name, 2: result_time, 3: rank, 4: has_fastest_lap, 5: team_name]
+        # [0: driver_id, 1: driver_name, 2: result_time, 3: rank, 4: has_fastest_lap, 5: team_name, 6: is_sprint]
         drivers = c.fetchall()
 
         results = {"results": []}
@@ -247,6 +274,7 @@ def getRaceResults(raceID: str):
                     "teamName": d[5],
                     "rank": d[3],
                     "hasFastestLap": d[4],
+                    "isSprint": d[6],
                 }
             )
 

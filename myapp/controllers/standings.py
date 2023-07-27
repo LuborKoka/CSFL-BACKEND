@@ -2,22 +2,22 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
 from typing import List, TypedDict
 import json
-import base64
 
 
 def getStandings(seasonID: str):
     # treba pridat penalizacie
+    # pridane
 
     try:
         with connection.cursor() as c:
             # pohar jazdcov
             c.execute(
-                """
+                """ 
                     WITH total_pents AS (
                         SELECT DISTINCT ON(pents.driver_id, pents.race_id) driver_id, race_id, SUM(time) OVER (PARTITION BY driver_id, race_id)
                             FROM (
-                                SELECT * 
-                                FROM penalties AS p 
+                                SELECT *
+                                FROM penalties AS p
                                 JOIN reports AS r ON p.report_id = r.id
                             ) AS pents
                             ORDER BY driver_id, race_id
@@ -25,7 +25,7 @@ def getStandings(seasonID: str):
                     results AS (
                         SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
                         FROM (
-                            SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time
+                            SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint
                             FROM races_drivers AS rd
                             JOIN races AS r ON rd.race_id = r.id
                             LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
@@ -36,22 +36,39 @@ def getStandings(seasonID: str):
                     res_with_points AS (
                         SELECT d.id AS driver_id, d.name AS driver_name, sd.is_reserve, tr.flag, t.name AS team_name, rd.time, rd.has_fastest_lap, re.rank, r.date,
                             CASE
-                                WHEN re.rank = 1 THEN 25
-                                WHEN re.rank = 2 THEN 18
-                                WHEN re.rank = 3 THEN 15
-                                WHEN re.rank = 4 THEN 12
-                                WHEN re.rank = 5 THEN 10
-                                WHEN re.rank = 6 THEN 8
-                                WHEN re.rank = 7 THEN 6
-                                WHEN re.rank = 8 THEN 4
-                                WHEN re.rank = 9 THEN 2
-                                WHEN re.rank = 10 THEN 1
-                                ELSE 0
+                                WHEN r.is_sprint = TRUE THEN
+                                    CASE
+                                        WHEN re.rank = 1 THEN 8
+                                        WHEN re.rank = 2 THEN 7
+                                        WHEN re.rank = 3 THEN 6
+                                        WHEN re.rank = 4 THEN 5
+                                        WHEN re.rank = 5 THEN 4
+                                        WHEN re.rank = 6 THEN 3
+                                        WHEN re.rank = 7 THEN 2
+                                        WHEN re.rank = 8 THEN 1
+                                        ELSE 0
+                                    END
+                                ELSE 
+                                    CASE
+                                        WHEN re.rank = 1 THEN 25
+                                        WHEN re.rank = 2 THEN 18
+                                        WHEN re.rank = 3 THEN 15
+                                        WHEN re.rank = 4 THEN 12
+                                        WHEN re.rank = 5 THEN 10
+                                        WHEN re.rank = 6 THEN 8
+                                        WHEN re.rank = 7 THEN 6
+                                        WHEN re.rank = 8 THEN 4
+                                        WHEN re.rank = 9 THEN 2
+                                        WHEN re.rank = 10 THEN 1
+                                        ELSE 0
+                                    END
                             END +
                             CASE
-                                WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 THEN 1
+                                WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
                                 ELSE 0
-                            END AS points, r.id AS race_id, tr.id AS track_id
+                            END AS points,
+                            r.id AS race_id, 
+                            tr.id AS track_id
                         FROM seasons_drivers AS sd
                         JOIN races AS r ON r.season_id = sd.season_id
                         JOIN tracks AS tr ON tr.id = r.track_id
@@ -62,9 +79,12 @@ def getStandings(seasonID: str):
                         WHERE sd.season_id = %s
                     )
 
-                    SELECT *, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count
-                    FROM res_with_points
-                    ORDER BY points_total DESC, driver_name, date
+
+                    SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
+                        NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint DESC
+                    FROM res_with_points AS rwp
+                    JOIN races AS r ON rwp.race_id = r.id
+                    ORDER BY points_total DESC, driver_name, rwp.date, r.is_sprint DESC
                 """,
                 [seasonID, seasonID],
             )
@@ -73,10 +93,14 @@ def getStandings(seasonID: str):
 
             # team_name a race_name by mali byt neskor nahradene ikonkou (tim mozno, race urcite)
             data = c.fetchall()
+
+            if len(data) == 0:
+                return HttpResponse(status=204)
+
             raceCount = data[0][13]
 
             # [0: driver_id, 1: driver_name, 2: is_reserve, 3: flag, 4: team_name, 5: time, 6: has_fastest_lap,
-            # 7: rank, 8: date, 9: points, 10: race_id, 11: track_id, 12: points_total, 13: race_count]
+            # 7: rank, 8: date, 9: points, 10: race_id, 11: track_id, 12: points_total, 13: race_count, 14: has_been_raced]
 
             for i in range(raceCount):
                 result["races"].append(
@@ -97,8 +121,14 @@ def getStandings(seasonID: str):
                         {
                             "teamName": data[i * raceCount + ii][4],
                             "hasFastestLap": data[i * raceCount + ii][6],
-                            "rank": data[i * raceCount + ii][7],
+                            "rank": getDnsDnfRank(
+                                data[i * raceCount + ii][2],
+                                data[i * raceCount + ii][5],
+                                data[i * raceCount + ii][4],
+                                data[i * raceCount + ii][7],
+                            ),
                             "points": data[i * raceCount + ii][9],
+                            "hasBeenRaced": data[i * raceCount + ii][14],
                         }
                     )
 
@@ -110,16 +140,16 @@ def getStandings(seasonID: str):
                     WITH total_pents AS (
                         SELECT DISTINCT ON(pents.driver_id, pents.race_id) driver_id, race_id, SUM(time) OVER (PARTITION BY driver_id, race_id)
                             FROM (
-                                SELECT * 
-                                FROM penalties AS p 
+                                SELECT *
+                                FROM penalties AS p
                                 JOIN reports AS r ON p.report_id = r.id
                             ) AS pents
                             ORDER BY driver_id, race_id
                     ),
                     ranks AS (
-                        SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC)
+                        SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC), race_id, is_sprint
                         FROM (
-                            SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id
+                            SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint
                             FROM races_drivers AS rd
                             JOIN races AS r ON rd.race_id = r.id
                             JOIN teams AS t ON rd.team_id = t.id
@@ -131,20 +161,35 @@ def getStandings(seasonID: str):
                     points AS (
                         SELECT *,
                             CASE
-                                WHEN rank = 1 THEN 25
-                                WHEN rank = 2 THEN 18
-                                WHEN rank = 3 THEN 15
-                                WHEN rank = 4 THEN 12
-                                WHEN rank = 5 THEN 10
-                                WHEN rank = 6 THEN 8
-                                WHEN rank = 7 THEN 6
-                                WHEN rank = 8 THEN 4
-                                WHEN rank = 9 THEN 2
-                                WHEN rank = 10 THEN 1
-                                ELSE 0
+                                WHEN is_sprint = TRUE THEN
+                                    CASE
+                                        WHEN rank = 1 THEN 8
+                                        WHEN rank = 2 THEN 7
+                                        WHEN rank = 3 THEN 6
+                                        WHEN rank = 4 THEN 5
+                                        WHEN rank = 5 THEN 4
+                                        WHEN rank = 6 THEN 3
+                                        WHEN rank = 7 THEN 2
+                                        WHEN rank = 8 THEN 1
+                                        ELSE 0
+                                    END
+                                ELSE 
+                                    CASE
+                                        WHEN rank = 1 THEN 25
+                                        WHEN rank = 2 THEN 18
+                                        WHEN rank = 3 THEN 15
+                                        WHEN rank = 4 THEN 12
+                                        WHEN rank = 5 THEN 10
+                                        WHEN rank = 6 THEN 8
+                                        WHEN rank = 7 THEN 6
+                                        WHEN rank = 8 THEN 4
+                                        WHEN rank = 9 THEN 2
+                                        WHEN rank = 10 THEN 1
+                                        ELSE 0
+                                    END
                             END +
                             CASE
-                                WHEN has_fastest_lap = TRUE AND rank <= 10 THEN 1
+                                WHEN has_fastest_lap = TRUE AND rank <= 10 AND is_sprint = FALSE THEN 1
                                 ELSE 0
                             END AS points
                         FROM ranks
@@ -172,3 +217,16 @@ def getStandings(seasonID: str):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+
+
+def getDnsDnfRank(isReserve: bool, time: float | None, teamName: str | None, rank: int):
+    if isReserve and teamName == None:
+        return ""
+
+    if teamName == None:
+        return "DNS"
+
+    if time == None:
+        return "DNF"
+
+    return rank

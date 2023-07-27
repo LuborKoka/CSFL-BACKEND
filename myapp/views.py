@@ -25,6 +25,8 @@ from .controllers.scheduleRelated import (
     submitTeamsDrivers,
     postSchedule,
     getSchedule,
+    deleteSchedule,
+    patchInSchedule,
     deleteFromSchedule,
 )
 from .controllers.verdict import (
@@ -32,9 +34,16 @@ from .controllers.verdict import (
     getConcernedDrivers,
     getRaceReportsFIAVersion,
 )
-from .controllers.seasons import createSeason, getSeasonSchedule, getAllSeasons
+from .controllers.seasons import (
+    createSeason,
+    getSeasonSchedule,
+    getAllSeasons,
+    getNonReserveDrivers,
+    postNewReserves,
+)
 from .controllers.standings import getStandings
-from .controllers.media import raceImage as getRaceImage, reportVideo
+from .controllers.media import raceImage as getRaceImage, media
+from .controllers.driverLineUp import postTeamDrivers, getTeamDrivers
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -207,7 +216,7 @@ def fetchAllTeamsDriversView(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
-# api/race/<str:race_id>/results/
+# api/races/<str:race_id>/results/
 @csrf_exempt
 def raceResults(req: HttpRequest, race_id: str):
     if req.method == "GET":
@@ -242,16 +251,27 @@ def editRaceResults(req: HttpRequest, race_id: str):
 
 
 @csrf_exempt
-def schedule(req: HttpRequest, object_id: str):
+def schedule(req: HttpRequest, season_id: str):
     if req.method == "GET":
-        return getSchedule(object_id)
+        return getSchedule(season_id)
 
     if req.method == "POST":
         data = json.loads(req.body)
-        return postSchedule(data["params"], object_id)
+        return postSchedule(data["params"], season_id)
 
     if req.method == "DELETE":
-        return deleteFromSchedule(object_id)
+        return deleteSchedule(season_id)
+
+    return HttpResponseNotFound()
+
+
+@csrf_exempt
+def changeSchedule(req: HttpRequest, season_id: str, race_id: str):
+    if req.method == "PATCH":
+        return patchInSchedule(race_id, season_id, json.loads(req.body)["params"])
+
+    if req.method == "DELETE":
+        return deleteFromSchedule(race_id, season_id)
 
     return HttpResponseNotFound()
 
@@ -277,6 +297,41 @@ def raceImage(req: HttpRequest, track_id: str):
 @csrf_exempt
 def reportVideoView(req: HttpRequest, name: str):
     if req.method == "GET":
-        return reportVideo(name)
+        return media(name)
+
+    return HttpResponseNotFound()
+
+
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+# admin views
+
+
+@csrf_exempt
+def seasonDrivers(req: HttpRequest, season_id: str):
+    if req.method == "GET":
+        return getTeamDrivers(season_id)
+
+    if req.method == "POST":
+        return postTeamDrivers(season_id, json.loads(req.body)["params"])
+
+    return HttpResponseNotFound()
+
+
+@csrf_exempt
+def seasonReserves(req: HttpRequest, season_id: str):
+    if req.method == "GET":
+        return getNonReserveDrivers(season_id)
+
+    if req.method == "POST":
+        return postNewReserves(season_id, json.loads(req.body)["params"])
 
     return HttpResponseNotFound()

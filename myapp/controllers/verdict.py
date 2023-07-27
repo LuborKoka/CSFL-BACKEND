@@ -48,10 +48,8 @@ def postVerdict(reportID: str, params: NewVerdict):
         report.verdict = params["content"]
         report.save()
 
-        print(params["penalties"])
-
         if len(params["penalties"]) == 0:
-            return HttpResponse(status=200)
+            return HttpResponse(status=204)
 
         data = []
 
@@ -67,7 +65,7 @@ def postVerdict(reportID: str, params: NewVerdict):
                 data,
             )
 
-        return HttpResponse(status=200)
+        return HttpResponse(status=204)
 
     except Exception as e:
         print(e)
@@ -99,7 +97,10 @@ def getRaceReportsFIAVersion(raceID: str):
 
             for rt in r.reporttargets_set.all():
                 drivers.append(
-                    {"driverID": str(rt.driver.id), "driverName": rt.driver.name}
+                    {
+                        "driverID": "hra" if rt.driver == None else str(rt.driver.id),
+                        "driverName": "Hra" if rt.driver == None else rt.driver.name,
+                    }
                 )
 
             if r.verdict == None:

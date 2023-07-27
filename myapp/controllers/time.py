@@ -13,6 +13,9 @@ def gap_to_time(time: float, gap: str) -> float:
     - The total time in seconds
     """
     # Check if the gap string matches the provided format
+    if gap.lower() == "dnf":
+        return None
+
     match = re.match(r"\+(([0-5]?[0-9]):)?([0-5]?[0-9])([.,][0-9]{1,3})?", gap)
 
     if match is None:

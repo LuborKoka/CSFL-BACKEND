@@ -43,6 +43,7 @@ class changePasswordParams(TypedDict):
 
 # doplnit pri registracii race name, ak uz existuje, prepojit, ak nie, vytvorit noveho drajvera
 # doplnene
+# doplnit, aby nejebalo existujuci link driver-user
 def userSignUp(params: signUpParams, SECRET_KEY: str):
     if params["password"] != params["passwordConfirm"]:
         return HttpResponseBadRequest()

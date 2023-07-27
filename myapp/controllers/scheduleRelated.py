@@ -1,6 +1,6 @@
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
-from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers
+from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers, Seasons
 import json
 from typing import TypedDict, List, Dict
 
@@ -17,8 +17,14 @@ class SubmitTeamsDriversParams(TypedDict):
     # }[]
 
 
+class Race(TypedDict):
+    trackID: str
+    timestamp: str
+    hasSprint: bool
+
+
 class PostScheduleParams(TypedDict):
-    races: List[Dict[str, str]]
+    races: List[Race]
     seasonID: str
     # races: {
     #    trackID: string,
@@ -26,14 +32,19 @@ class PostScheduleParams(TypedDict):
     # }[]
 
 
+class PatchRaceParams(TypedDict):
+    trackID: str
+    date: str
+
+
 def getAllAvailableTracks():
     try:
         # pristup k riadkom: tracks[index]["fieldname"]
-        tracks = Tracks.objects.values("id", "name").all()
+        tracks = Tracks.objects.all()
         data = {"tracks": []}
 
         for track in tracks:
-            data["tracks"].append({"id": str(track["id"]), "name": track["name"]})
+            data["tracks"].append({"id": str(track.id), "name": track.race_name})
 
         return HttpResponse(json.dumps(data), status=200)
 
@@ -51,11 +62,13 @@ def fetchAllTeamsDrivers(seasonID: str):
         data = {"teams": [], "drivers": []}
 
         for t in teams:
-            team = {"id": str(t.id), "name": t.name, "signed": []}
+            team = {"id": str(t.id), "name": t.name, "signed": [], "color": t.color}
 
             for s in signed:
                 if s.team_id == t.id:
-                    team["signed"].append(str(s.driver_id))
+                    team["signed"].append(
+                        {"id": str(s.driver.id), "name": s.driver.name}
+                    )
             data["teams"].append(team)
 
         for d in drivers:
@@ -95,23 +108,37 @@ def submitTeamsDrivers(data: SubmitTeamsDriversParams):
 
 
 def postSchedule(params: PostScheduleParams, seasonID):
+    races = []
+    sprints = []
+
+    for row in params["races"]:
+        races.append([row["timestamp"], row["trackID"], seasonID])
+        print(row["hasSprint"])
+
+        if row["hasSprint"]:
+            sprints.append([row["timestamp"], row["trackID"], seasonID])
+
+    c = connection.cursor()
+
     try:
-        result = {"races": []}
+        c.executemany(
+            """
+                INSERT INTO races(date, track_id, season_id)
+                VALUES(%s, %s, %s)
+            """,
+            races,
+        )
 
-        for row in params["races"]:
-            with connection.cursor() as c:
-                c.execute(
-                    """
-                    INSERT INTO races(date, track_id, season_id, name)
-                    VALUES (%s, %s, %s, 'random name')
-                    RETURNING id
-                    """,
-                    [row["timestamp"], row["trackID"], seasonID],
-                )
+        if len(sprints) > 0:
+            c.executemany(
+                """
+                    INSERT INTO races(date, track_id, season_id, is_sprint)
+                    VALUES(%s, %s, %s, true)
+                """,
+                sprints,
+            )
 
-                result["races"].append(str(c.fetchone()[0]))
-
-        return HttpResponse(json.dumps(result), status=200)
+        return HttpResponse(status=204)
 
     except Exception as e:
         print(e)
@@ -120,12 +147,25 @@ def postSchedule(params: PostScheduleParams, seasonID):
 
 def getSchedule(seasonID):
     try:
-        schedule = Races.objects.filter(season_id=seasonID).order_by("date")
-        result = {"races": []}
+        schedule = (
+            Races.objects.filter(season_id=seasonID)
+            .select_related("track")
+            .order_by("date", "-is_sprint")
+        )
+
+        season = Seasons.objects.get(id=seasonID)
+
+        result = {"races": [], "seasonName": season.name}
 
         for r in schedule:
             result["races"].append(
-                {"id": str(r.id), "date": str(r.date), "trackID": str(r.track_id)}
+                {
+                    "id": str(r.id),
+                    "date": str(r.date),
+                    "raceName": r.track.race_name,
+                    "trackID": str(r.track.id),
+                    "isSprint": r.is_sprint,
+                }
             )
 
         return HttpResponse(json.dumps(result), status=200)
@@ -134,9 +174,35 @@ def getSchedule(seasonID):
         return HttpResponseBadRequest()
 
 
-def deleteFromSchedule(raceID: str):
+def deleteSchedule(seasonID: str):
     try:
-        Races.objects.get(id=raceID).delete()
+        Seasons.objects.get(id=seasonID).delete()
+
+        return HttpResponse(status=204)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()
+
+
+def deleteFromSchedule(raceID: str, seasonID: str):
+    try:
+        Races.objects.get(id=raceID, season_id=seasonID).delete()
+
+        return HttpResponse(status=204)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseBadRequest()
+
+
+def patchInSchedule(raceID: str, seasonID: str, params: PatchRaceParams):
+    try:
+        track = Tracks.objects.get(id=params["trackID"])
+        race = Races.objects.get(id=raceID, season_id=seasonID)
+        race.track = track
+        race.date = params["date"]
+        race.save()
 
         return HttpResponse(status=204)
 

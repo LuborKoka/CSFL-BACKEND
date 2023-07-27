@@ -34,20 +34,24 @@ urlpatterns = [
     path("api/report/<str:report_id>/response/", views.reportResponse),
     path("api/report/<str:report_id>/verdict/", views.reportVerdict),
     path("api/fia/<str:race_id>/drivers/", views.raceReportsFIA),
-    path("api/videos/report/<str:name>/", views.reportVideoView),
+    path("api/media/<str:name>/", views.reportVideoView),
     path("api/seasons/", views.seasons),  # seasons.py
-    path("api/season-schedule/<str:season_id>/", views.season),  # seasons.py
+    path(
+        "api/season-schedule/<str:season_id>/",
+        views.season,  # mal by uz byt nahradeny a moze sa zrejme vymazat, get metoda urcite
+    ),  # seasons.py; toto a "api/admins/schedule/<str:season_id>/" vyzeraju rovnako
     path("api/admins/create-season/", views.createSeasonView),  # seasons.py
-    path("api/admins/all-tracks/", views.fetchAllTracks),  # scheduleRelated.py
     path(
-        "api/admins/all-teams-and-drivers/<str:season_id>/",
-        views.fetchAllTeamsDriversView,
-    ),  # scheduleRelated.py
+        "api/admins/all-tracks/", views.fetchAllTracks
+    ),  # scheduleRelated.py, zoznam dostupnych trati pre vytvorenie novej GP
     path(
-        "api/admins/schedule/<str:object_id>/",
+        "api/schedule/<str:season_id>/",  # zlucim dokopy s obycajnym endpointom pre pouzivatela a okrem get metody dam autorizaciu
         views.schedule
-        # vytvorenie pretekov sezony, ziskanie jej pretekov, uprava a vymazanie
-    ),  # scheduleRelated.py; object_id je season_id, pre delete metodu je to race.id, ktora bude vymazana
+        # vytvorenie pretekov sezony, ziskanie jej pretekov, uprava a vymazanie (toto uz plati pre samotnu sezonu, nie jej preteky, na upravu pretekov bude iny endpoint)
+    ),  # scheduleRelated.py
+    path("api/admins/season-drivers/<str:season_id>/", views.seasonDrivers),
+    path("api/admins/season-drivers/<str:season_id>/reserves/", views.seasonReserves),
+    path("api/admins/schedule/<str:season_id>/<str:race_id>/", views.changeSchedule),
     path("api/admins/edit-race/<str:race_id>/drivers/", views.editRaceDrivers),
     path("api/admins/edit-race/<str:race_id>/results/", views.editRaceResults),
     path("api/seasons/<str:season_id>/standings/", views.standings),

@@ -210,16 +210,18 @@ class Races(models.Model):
 
     date = models.DateTimeField()
 
-    name = models.TextField()
-
     track = models.ForeignKey("Tracks", models.DO_NOTHING)
 
     season = models.ForeignKey("Seasons", models.DO_NOTHING)
+
+    is_sprint = models.BooleanField(blank=True, null=True)
 
     class Meta:
         managed = False
 
         db_table = "races"
+
+        unique_together = (("season", "date", "is_sprint"),)
 
 
 class RacesDrivers(models.Model):
@@ -333,6 +335,8 @@ class SeasonsDrivers(models.Model):
         managed = False
 
         db_table = "seasons_drivers"
+
+        unique_together = (("driver", "season"),)
 
 
 class Teams(models.Model):

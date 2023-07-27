@@ -50,7 +50,8 @@ res_with_points AS (
 	WHERE sd.season_id = %s
 )
 
-SELECT *, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count
+SELECT *, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
+	NOW() > (date + INTERVAL '3 hours') AS has_been_raced
 FROM res_with_points
 ORDER BY points_total DESC, driver_name, date
 ```
