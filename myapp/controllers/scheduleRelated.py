@@ -1,8 +1,9 @@
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
 from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers, Seasons
-import json
+import json, pytz
 from typing import TypedDict, List, Dict
+from datetime import datetime
 
 
 class CreateSeasonParams(TypedDict):
@@ -53,6 +54,7 @@ def getAllAvailableTracks():
         return HttpResponseBadRequest()
 
 
+# momentalne nepouzivane, prenechane len pre pripad
 def fetchAllTeamsDrivers(seasonID: str):
     try:
         teams = Teams.objects.all()
@@ -81,6 +83,7 @@ def fetchAllTeamsDrivers(seasonID: str):
         return HttpResponseBadRequest()
 
 
+# momentalne nepouzivane, prenechane len pre pripad
 def submitTeamsDrivers(data: SubmitTeamsDriversParams):
     for row in data["teams"]:
         print(row["drivers"])
@@ -111,12 +114,27 @@ def postSchedule(params: PostScheduleParams, seasonID):
     races = []
     sprints = []
 
+    zone = pytz.timezone("Europe/Budapest")
+
     for row in params["races"]:
-        races.append([row["timestamp"], row["trackID"], seasonID])
-        print(row["hasSprint"])
+        races.append(
+            [
+                zone.localize(datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M")),
+                row["trackID"],
+                seasonID,
+            ]
+        )
 
         if row["hasSprint"]:
-            sprints.append([row["timestamp"], row["trackID"], seasonID])
+            sprints.append(
+                [
+                    zone.localize(
+                        datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M")
+                    ),
+                    row["trackID"],
+                    seasonID,
+                ]
+            )
 
     c = connection.cursor()
 
@@ -165,6 +183,7 @@ def getSchedule(seasonID):
                     "raceName": r.track.race_name,
                     "trackID": str(r.track.id),
                     "isSprint": r.is_sprint,
+                    "image": r.track.image,
                 }
             )
 

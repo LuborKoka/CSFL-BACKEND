@@ -13,7 +13,7 @@ WITH total_pents AS (
 results AS (
 	SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
 	FROM (
-		SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time
+		SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint
 		FROM races_drivers AS rd
 		JOIN races AS r ON rd.race_id = r.id
 		LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
@@ -24,22 +24,43 @@ results AS (
 res_with_points AS (
 	SELECT d.id AS driver_id, d.name AS driver_name, sd.is_reserve, tr.flag, t.name AS team_name, rd.time, rd.has_fastest_lap, re.rank, r.date,
 		CASE
-			WHEN re.rank = 1 THEN 25
-			WHEN re.rank = 2 THEN 18
-			WHEN re.rank = 3 THEN 15
-			WHEN re.rank = 4 THEN 12
-			WHEN re.rank = 5 THEN 10
-			WHEN re.rank = 6 THEN 8
-			WHEN re.rank = 7 THEN 6
-			WHEN re.rank = 8 THEN 4
-			WHEN re.rank = 9 THEN 2
-			WHEN re.rank = 10 THEN 1
-			ELSE 0
-		END +
-		CASE
-			WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 THEN 1
-			ELSE 0
-		END AS points, r.id AS race_id, tr.id AS track_id
+			WHEN rd.time IS NULL THEN 0
+			ELSE
+				CASE
+					WHEN r.is_sprint = TRUE THEN
+						CASE
+							WHEN re.rank = 1 THEN 8
+							WHEN re.rank = 2 THEN 7
+							WHEN re.rank = 3 THEN 6
+							WHEN re.rank = 4 THEN 5
+							WHEN re.rank = 5 THEN 4
+							WHEN re.rank = 6 THEN 3
+							WHEN re.rank = 7 THEN 2
+							WHEN re.rank = 8 THEN 1
+							ELSE 0
+						END
+					ELSE
+						CASE
+							WHEN re.rank = 1 THEN 25
+							WHEN re.rank = 2 THEN 18
+							WHEN re.rank = 3 THEN 15
+							WHEN re.rank = 4 THEN 12
+							WHEN re.rank = 5 THEN 10
+							WHEN re.rank = 6 THEN 8
+							WHEN re.rank = 7 THEN 6
+							WHEN re.rank = 8 THEN 4
+							WHEN re.rank = 9 THEN 2
+							WHEN re.rank = 10 THEN 1
+							ELSE 0
+						END
+				END +
+				CASE
+					WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
+					ELSE 0
+				END
+		END AS points,
+		r.id AS race_id,
+		tr.id AS track_id
 	FROM seasons_drivers AS sd
 	JOIN races AS r ON r.season_id = sd.season_id
 	JOIN tracks AS tr ON tr.id = r.track_id
@@ -49,11 +70,11 @@ res_with_points AS (
 	LEFT JOIN results AS re ON rd.driver_id = re.driver_id AND rd.race_id = re.race_id
 	WHERE sd.season_id = %s
 )
-
-SELECT *, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
-	NOW() > (date + INTERVAL '3 hours') AS has_been_raced
-FROM res_with_points
-ORDER BY points_total DESC, driver_name, date
+SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
+	NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint DESC
+FROM res_with_points AS rwp
+JOIN races AS r ON rwp.race_id = r.id
+ORDER BY points_total DESC, driver_name, rwp.date, r.is_sprint DESC
 ```
 
 Bude sem treba doplnit sprinty a penalizacie of FIA. Niekde do CTE results snad.  
@@ -77,9 +98,9 @@ WITH total_pents AS (
 		ORDER BY driver_id, race_id
 ),
 ranks AS (
-	SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC)
+	SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC), race_id, is_sprint, time
 	FROM (
-		SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id
+		SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint
 		FROM races_drivers AS rd
 		JOIN races AS r ON rd.race_id = r.id
 		JOIN teams AS t ON rd.team_id = t.id
@@ -91,21 +112,40 @@ ranks AS (
 points AS (
 	SELECT *,
 		CASE
-			WHEN rank = 1 THEN 25
-			WHEN rank = 2 THEN 18
-			WHEN rank = 3 THEN 15
-			WHEN rank = 4 THEN 12
-			WHEN rank = 5 THEN 10
-			WHEN rank = 6 THEN 8
-			WHEN rank = 7 THEN 6
-			WHEN rank = 8 THEN 4
-			WHEN rank = 9 THEN 2
-			WHEN rank = 10 THEN 1
-			ELSE 0
-		END +
-		CASE
-			WHEN has_fastest_lap = TRUE AND rank <= 10 THEN 1
-			ELSE 0
+			WHEN time IS NULL THEN 0
+			ELSE
+				CASE
+					WHEN is_sprint = TRUE THEN
+						CASE
+							WHEN rank = 1 THEN 8
+							WHEN rank = 2 THEN 7
+							WHEN rank = 3 THEN 6
+							WHEN rank = 4 THEN 5
+							WHEN rank = 5 THEN 4
+							WHEN rank = 6 THEN 3
+							WHEN rank = 7 THEN 2
+							WHEN rank = 8 THEN 1
+							ELSE 0
+						END
+					ELSE
+						CASE
+							WHEN rank = 1 THEN 25
+							WHEN rank = 2 THEN 18
+							WHEN rank = 3 THEN 15
+							WHEN rank = 4 THEN 12
+							WHEN rank = 5 THEN 10
+							WHEN rank = 6 THEN 8
+							WHEN rank = 7 THEN 6
+							WHEN rank = 8 THEN 4
+							WHEN rank = 9 THEN 2
+							WHEN rank = 10 THEN 1
+							ELSE 0
+						END
+				END +
+				CASE
+					WHEN has_fastest_lap = TRUE AND rank <= 10 AND is_sprint = FALSE THEN 1
+					ELSE 0
+				END
 		END AS points
 	FROM ranks
 ),
@@ -119,6 +159,32 @@ ORDER BY sum DESC
 ```
 
 Mozno do buducna by bolo fajn vypocitat do poradia aj pocet vitazstiev, keby nahodou
+
+Query pre trestne body:
+
+```sql
+WITH penalty_points AS (
+	SELECT DISTINCT ON(driver_id) driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points
+	FROM (
+		SELECT penalty_points, p.driver_id, r.race_id, report_id
+		FROM penalties AS p
+		JOIN reports AS r ON r.id = p.report_id
+		JOIN drivers AS d ON d.id = p.driver_id
+		WHERE penalty_points > 0
+	) AS p
+	JOIN reports AS r ON r.id = p.report_id
+	ORDER BY driver_id
+)
+
+SELECT d.id, d.name, tr.flag, r.id, report_id, points, COALESCE(SUM(points) OVER (PARTITION BY d.id), 0) AS points_total
+FROM seasons_drivers AS sd
+JOIN races AS r ON r.season_id = sd.season_id
+JOIN tracks AS tr ON tr.id = r.track_id
+JOIN drivers AS d ON d.id = sd.driver_id
+LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
+LEFT JOIN penalty_points AS p ON sd.driver_id = p.driver_id AND r.id = p.race_id
+WHERE sd.season_id = %s
+```
 
 V `races.py` getRaceResults:
 

@@ -11,7 +11,6 @@ from .controllers.authentication import (
 )
 from .controllers.report import reportUpload, getReports, postReportResponse
 from .controllers.races import (
-    getRaces,
     getRaceDrivers,
     getEditRace,
     postEditRaceDrivers,
@@ -21,8 +20,6 @@ from .controllers.races import (
 )
 from .controllers.scheduleRelated import (
     getAllAvailableTracks,
-    fetchAllTeamsDrivers,
-    submitTeamsDrivers,
     postSchedule,
     getSchedule,
     deleteSchedule,
@@ -36,27 +33,17 @@ from .controllers.verdict import (
 )
 from .controllers.seasons import (
     createSeason,
-    getSeasonSchedule,
     getAllSeasons,
     getNonReserveDrivers,
     postNewReserves,
+    getFiaCandidates,
+    postFIA,
 )
 from .controllers.standings import getStandings
 from .controllers.media import raceImage as getRaceImage, media
 from .controllers.driverLineUp import postTeamDrivers, getTeamDrivers
-import os, binascii, base64
-
-SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
-
-
-def my_view(request, param):
-    if request.method == "POST":
-        body_param = request.POST.get("body_param")
-        # Handle the request body parameter
-
-    # Handle the URL parameter
-    response_data = {"url_param": param, "message": "Hello, Django!"}
-    return JsonResponse(response_data)
+from .views_folder.userViews import SECRET_KEY
+from .controllers.credentials import isUserPermitted
 
 
 def hello(request: HttpRequest):
@@ -73,6 +60,7 @@ def hello(request: HttpRequest):
     return HttpResponse("<h1>Hello Word</h1>")
 
 
+# done
 @csrf_exempt  # api/signup/
 def signup(req: HttpRequest):
     if req.method == "POST":
@@ -82,9 +70,9 @@ def signup(req: HttpRequest):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt  # api/login/
 def signin(req: HttpRequest):
-    print("signin request recieved")
     if req.method == "POST":
         # for attr_name in dir(req):
         #     attr_value = getattr(req, attr_name)
@@ -95,6 +83,7 @@ def signin(req: HttpRequest):
     return HttpResponseNotFound()
 
 
+# aint even used
 @csrf_exempt
 def changeRole(req: HttpRequest):
     if req.method == "PATCH":
@@ -103,6 +92,7 @@ def changeRole(req: HttpRequest):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt  # api/change-password/
 def changePasswordEndpoint(req: HttpRequest):
     if req.method == "PATCH":
@@ -111,6 +101,7 @@ def changePasswordEndpoint(req: HttpRequest):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt  # api/races/<str:race_id>/report/
 def report(req: HttpRequest, race_id: str):
     if req.method == "GET":
@@ -124,6 +115,7 @@ def report(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt
 def reportResponse(req: HttpRequest, report_id: str):
     if req.method == "POST":
@@ -134,6 +126,7 @@ def reportResponse(req: HttpRequest, report_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/report/<str:report_id>/verdict/
 @csrf_exempt
 def reportVerdict(req: HttpRequest, report_id: str):
@@ -147,6 +140,7 @@ def reportVerdict(req: HttpRequest, report_id: str):
     return HttpResponseNotFound()
 
 
+# done
 def raceReportsFIA(req: HttpRequest, race_id: str):
     if req.method == "GET":
         return getRaceReportsFIAVersion(race_id)
@@ -154,13 +148,7 @@ def raceReportsFIA(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
-@csrf_exempt  # api/races/
-def fetchRaces(req: HttpRequest):
-    if req.method == "GET":
-        return getRaces()
-    return HttpResponseNotFound()
-
-
+# done
 @csrf_exempt  # api/races/<str:race_id>/drivers/
 def fetchRaceDrivers(req: HttpRequest, race_id: str):
     if req.method == "GET":
@@ -168,6 +156,7 @@ def fetchRaceDrivers(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt  # api/admins/all-tracks/
 def fetchAllTracks(req: HttpRequest):
     if req.method == "GET":
@@ -176,15 +165,7 @@ def fetchAllTracks(req: HttpRequest):
     return HttpResponseNotFound()
 
 
-# api/season-schedule/<str:season_id>/
-@csrf_exempt
-def season(req: HttpRequest, season_id: str):
-    if req.method == "GET":
-        return getSeasonSchedule(season_id)  # seasons.py
-
-    return HttpResponseNotFound()
-
-
+# done
 # api/seasons/
 @csrf_exempt
 def seasons(req: HttpRequest):
@@ -192,7 +173,8 @@ def seasons(req: HttpRequest):
         return getAllSeasons()
 
 
-# api/admins/all-tracks/
+# done
+# api/admins/create-season/
 @csrf_exempt
 def createSeasonView(req: HttpRequest):
     if req.method == "POST":
@@ -202,20 +184,7 @@ def createSeasonView(req: HttpRequest):
     return HttpResponseNotFound()
 
 
-# api/admins/all-teams-and-drivers/
-@csrf_exempt
-def fetchAllTeamsDriversView(req: HttpRequest, season_id: str):
-    if req.method == "GET":
-        return fetchAllTeamsDrivers(season_id)
-
-    if req.method == "POST":
-        print("request received")
-        data = json.loads(req.body)
-        return submitTeamsDrivers(data["params"])
-
-    return HttpResponseNotFound()
-
-
+# done
 # api/races/<str:race_id>/results/
 @csrf_exempt
 def raceResults(req: HttpRequest, race_id: str):
@@ -225,6 +194,7 @@ def raceResults(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/admins/edit-race/drivers/<str:race_id>/
 @csrf_exempt
 def editRaceDrivers(req: HttpRequest, race_id: str):
@@ -238,6 +208,7 @@ def editRaceDrivers(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/admins/edit-race/results/<str:race_id>/
 @csrf_exempt
 def editRaceResults(req: HttpRequest, race_id: str):
@@ -250,21 +221,23 @@ def editRaceResults(req: HttpRequest, race_id: str):
     return HttpResponseNotFound()
 
 
+# sorted
 @csrf_exempt
 def schedule(req: HttpRequest, season_id: str):
-    if req.method == "GET":
+    if req.method == "GET":  # preteky v sezone
         return getSchedule(season_id)
 
-    if req.method == "POST":
+    if req.method == "POST":  # pridanie pretekov do sezony
         data = json.loads(req.body)
         return postSchedule(data["params"], season_id)
 
-    if req.method == "DELETE":
+    if req.method == "DELETE":  # vymazanie celej sezony
         return deleteSchedule(season_id)
 
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt
 def changeSchedule(req: HttpRequest, season_id: str, race_id: str):
     if req.method == "PATCH":
@@ -276,6 +249,7 @@ def changeSchedule(req: HttpRequest, season_id: str, race_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/seasons/<str:season_id>/standings/
 def standings(req: HttpRequest, season_id: str):
     if req.method == "GET":
@@ -284,6 +258,7 @@ def standings(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/images/race/<str:track_id>/
 @csrf_exempt
 def raceImage(req: HttpRequest, track_id: str):
@@ -293,6 +268,7 @@ def raceImage(req: HttpRequest, track_id: str):
     return HttpResponseNotFound()
 
 
+# done
 # api/videos/report/<str:name>/
 @csrf_exempt
 def reportVideoView(req: HttpRequest, name: str):
@@ -315,8 +291,16 @@ def reportVideoView(req: HttpRequest, name: str):
 # admin views
 
 
+# done
 @csrf_exempt
 def seasonDrivers(req: HttpRequest, season_id: str):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(authorization_header, ["Sys Admin"])
+
+    if permission != True:
+        return permission
+
     if req.method == "GET":
         return getTeamDrivers(season_id)
 
@@ -326,6 +310,7 @@ def seasonDrivers(req: HttpRequest, season_id: str):
     return HttpResponseNotFound()
 
 
+# done
 @csrf_exempt
 def seasonReserves(req: HttpRequest, season_id: str):
     if req.method == "GET":
@@ -333,5 +318,17 @@ def seasonReserves(req: HttpRequest, season_id: str):
 
     if req.method == "POST":
         return postNewReserves(season_id, json.loads(req.body)["params"])
+
+    return HttpResponseNotFound()
+
+
+# done
+@csrf_exempt
+def seasonFia(req: HttpRequest, season_id: str):
+    if req.method == "GET":
+        return getFiaCandidates(season_id)
+
+    if req.method == "POST":
+        return postFIA(season_id, json.loads(req.body)["params"])
 
     return HttpResponseNotFound()

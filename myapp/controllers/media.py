@@ -2,6 +2,8 @@ from django.http import HttpResponse, HttpResponseBadRequest, FileResponse
 from ..models import Tracks
 from .report import FILE_PATH
 
+print(FILE_PATH)
+
 
 # potrebny rework na path namiesto track a team id, usetrim endpoint
 def raceImage(trackID: str):
@@ -19,9 +21,11 @@ def raceImage(trackID: str):
         return HttpResponseBadRequest()
 
 
-def media(name: str):
-    video_path = FILE_PATH + name  # Replace with the actual video path
+def media(name: str, folder: str):
+    video_path = (
+        FILE_PATH + name if folder is None else FILE_PATH + folder + "\\" + name
+    )
 
     response = FileResponse(open(video_path, "rb"))
-    response["Cache-Control"] = "public, max-age=259200"
+    response["Cache-Control"] = "public, max-age=31536000"
     return response

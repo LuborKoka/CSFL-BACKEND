@@ -1,7 +1,7 @@
 from django.db import connection
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 import json
-from ..models import Races, Seasons
+from ..models import Races, Seasons, UsersRoles
 from typing import TypedDict, List
 
 
@@ -9,55 +9,55 @@ class PostReservesParams(TypedDict):
     drivers: List[str]
 
 
+class PostFiaParams(TypedDict):
+    users: List[str]
+
+
 # raw query pri insertoch preto, aby id generovala db a nie django (aspon myslim)
 def createSeason(params):
+    c = connection.cursor()
+    roleName = params["name"] + "fia"
+
     try:
         data = {"seasonID": None}
-        with connection.cursor() as c:
-            c.execute(
-                """
-                INSERT INTO seasons (name)
+        c.execute(
+            """
+            INSERT INTO seasons (name)
+            VALUES (%s)
+            RETURNING id
+        """,
+            [params["name"]],
+        )
+
+        seasonID = str(c.fetchone()[0])
+
+        c.execute(
+            """
+                INSERT INTO roles(name)
                 VALUES (%s)
                 RETURNING id
             """,
-                [params["name"]],
-            )
-
-            data["seasonID"] = str(c.fetchone()[0])
-
-        return HttpResponse(json.dumps(data), status=200)
-
-    except Exception as e:
-        print(e)
-
-        return HttpResponseBadRequest()
-
-
-def getSeasonSchedule(seasonID: str):
-    try:
-        races = (
-            Races.objects.filter(season_id=seasonID)
-            .select_related("track")
-            .order_by("date")
+            [roleName],
         )
 
-        season = Seasons.objects.get(id=seasonID)
-        result = {"races": [], "seasonName": season.name}
+        roleID = str(c.fetchone()[0])
 
-        for race in races:
-            result["races"].append(
-                {
-                    "raceID": str(race.id),
-                    "date": str(race.date),
-                    "raceName": race.track.race_name,
-                    "name": race.track.name,
-                }
-            )
+        c.execute(
+            """
+                UPDATE seasons
+                SET fia_role_id = %s
+                WHERE id = %s
+            """,
+            [roleID, seasonID],
+        )
 
-        return HttpResponse(json.dumps(result), status=200)
+        data["seasonID"] = seasonID
+
+        return HttpResponse(json.dumps(data), status=201)
 
     except Exception as e:
         print(e)
+
         return HttpResponseBadRequest()
 
 
@@ -129,3 +129,97 @@ def postNewReserves(seasonID: str, params: PostReservesParams):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+
+
+def getFiaCandidates(seasonID: str):
+    c = connection.cursor()
+    try:
+        # vyberie aj current fiu, ALE
+        # ta potrebuje byt tiez medzi options, takze je to dobre
+        result = {"users": [], "currentFIA": []}
+        c.execute(
+            """
+                WITH excluded AS (
+                    SELECT u.id AS user_id, d.name
+                    FROM users AS u
+                    JOIN drivers AS d ON u.driver_id = d.id
+                    JOIN seasons_drivers AS sd ON sd.driver_id = d.id
+                    WHERE sd.season_id = %s
+                )
+                SELECT u.id, d.name
+                FROM users AS u
+                JOIN drivers AS d ON d.id = u.driver_id
+                LEFT JOIN excluded AS e ON u.id = e.user_id
+                WHERE user_id IS NULL
+
+            """,
+            [seasonID],
+        )
+
+        users = c.fetchall()
+
+        for u in users:
+            result["users"].append({"userID": str(u[0]), "driverName": u[1]})
+
+        # current fia
+        c.execute(
+            """
+                SELECT u.id, d.name
+                FROM users AS u
+                JOIN drivers AS d ON d.id = u.driver_id
+                JOIN users_roles AS ur ON ur.user_id = u.id
+                JOIN seasons AS s ON ur.role_id = s.fia_role_id
+                WHERE s.id = %s
+            """,
+            [seasonID],
+        )
+
+        current = c.fetchall()
+
+        for c in current:
+            result["currentFIA"].append({"userID": str(c[0]), "driverName": c[1]})
+
+        return HttpResponse(json.dumps(result), status=200)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseServerError()
+
+
+def postFIA(seasonID: str, params: PostFiaParams):
+    c = connection.cursor()
+
+    data = []
+
+    try:
+        c.execute(
+            """
+                DELETE FROM users_roles WHERE role_id = (SELECT fia_role_id FROM seasons WHERE id = %s)
+            """,
+            [seasonID],
+        )
+
+    except Exception as e:
+        print(e)
+        return HttpResponseServerError()
+
+    if len(params["users"]) == 0:
+        return HttpResponse(status=204)
+
+    for u in params["users"]:
+        data.append((u, seasonID))
+
+    try:
+        c.executemany(
+            """
+                INSERT INTO users_roles(user_id, role_id)
+                VALUES (%s, (SELECT fia_role_id FROM seasons WHERE id = %s))
+            """,
+            data,
+        )
+
+        return HttpResponse(status=204)
+
+    except Exception as e:
+        print(e)
+        return HttpResponseServerError()

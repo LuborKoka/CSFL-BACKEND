@@ -1,16 +1,14 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from typing import ItemsView
 from django.core.files.uploadedfile import InMemoryUploadedFile
-import os
 from manage import PATH
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Prefetch
 from typing import TypedDict, List
-import json
-from ..models import Reports, ReportTargets, ReportResponses, Penalties
+from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races
 from urllib.parse import urlparse, parse_qs
-import imghdr
-import os
+import imghdr, os, time, json
+from datetime import datetime, timedelta, timezone
 
 FILE_PATH = os.path.join(PATH, "media\\")
 FILE_PATH_DELIM = "++"
@@ -29,10 +27,26 @@ class ReportResponse(TypedDict):
     video: List[str]
 
 
+@transaction.atomic
 def reportUpload(
     files: ItemsView[str, InMemoryUploadedFile], form: FormData, raceID: str
 ):
     # if datum neni medzi zaciatkom koncom,
+    race = Races.objects.get(id=raceID)
+
+    endTime = (race.date + timedelta(days=1)).replace(hour=23, minute=59, second=59)
+    print(endTime)
+    local_offset = timezone(timedelta(seconds=-time.timezone))
+    print(datetime.now(local_offset))
+    if race.date > datetime.now(local_offset):
+        return HttpResponseBadRequest(
+            json.dumps({"error": "Ešte je na posielanie reportov skoro."})
+        )
+
+    if datetime.now(local_offset) > endTime:
+        return HttpResponseForbidden(
+            json.dumps({"error": "Čas na posielanie reportov už vypršal."})
+        )
 
     form = json.loads(form)
     video_paths = []
@@ -74,8 +88,8 @@ def reportUpload(
         video_paths.append(v)
 
     for name, file in files:
-        video_paths.append(FILE_PATH + str(id) + name)
-        with open(FILE_PATH + str(id) + name, "wb") as dst:
+        video_paths.append(FILE_PATH + "reports/" + str(id) + name)
+        with open(FILE_PATH + "/reports/" + str(id) + name, "wb") as dst:
             for chunk in file.chunks():
                 dst.write(chunk)
 
@@ -84,7 +98,7 @@ def reportUpload(
         report.video_path = FILE_PATH_DELIM.join(video_paths)
         report.save()
 
-        return HttpResponse(status=200)
+        return HttpResponse(status=204)
 
     except Exception as e:
         print(e)

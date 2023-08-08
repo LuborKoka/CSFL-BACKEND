@@ -53,7 +53,7 @@ def getTeamDrivers(seasonID: str):
         return HttpResponseBadRequest()
 
     try:
-        teams = Teams.objects.all()
+        teams = Teams.objects.all().order_by("name")
 
         for t in teams:
             drivers = SeasonsDrivers.objects.filter(
@@ -69,6 +69,7 @@ def getTeamDrivers(seasonID: str):
                     "name": t.name,
                     "drivers": teamDrivers,
                     "color": t.color,
+                    "image": t.logo,
                 }
             )
 
