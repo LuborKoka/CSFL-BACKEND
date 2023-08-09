@@ -4,7 +4,7 @@ from django.http import (
     HttpResponseNotFound,
     HttpResponseServerError,
 )
-from django.db import connection
+from django.db import connection, transaction
 from ..models import Races, RacesDrivers, SeasonsDrivers, Teams
 import json
 from typing import TypedDict, List
@@ -237,6 +237,7 @@ def getEditRaceResults(raceID: str):
 
 
 # bude treba aj sprinty doriesit
+@transaction.atomic
 def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
     # prepocet casu vitaza na sekundy
     leader = {
