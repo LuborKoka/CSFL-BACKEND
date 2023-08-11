@@ -10,7 +10,7 @@ from urllib.parse import urlparse, parse_qs
 import imghdr, os, time, json
 from datetime import datetime, timedelta, timezone
 
-FILE_PATH = os.path.join(PATH, "media\\")
+FILE_PATH = os.path.join(PATH, "media")
 FILE_PATH_DELIM = "++"
 
 
@@ -238,24 +238,25 @@ def postReportResponse(
 def processMediaPath(video_string: str):
     paths = video_string.split(FILE_PATH_DELIM)
 
+    delim = os.sep
+
     videos = {"local": [], "online": []}
 
     for p in paths:
         if PATH in p:
-            if not os.path.isfile(
-                p
-            ):  # ked neexistuje file, dam to ako image a zobrazi sa alt file not found hotovo
+            if not os.path.isfile(p):  
+                # ked neexistuje file, dam to ako image a zobrazi sa alt file not found hotovo
                 videos["local"].append(
-                    {"isImage": True, "url": p.replace(FILE_PATH, "")}
+                    {"isImage": True, "url": p.replace(FILE_PATH + delim, "")}
                 )
                 continue
 
             if imghdr.what(p) is not None:
                 videos["local"].append(
-                    {"isImage": True, "url": p.replace(FILE_PATH, "")}
+                    {"isImage": True, "url": p.replace(FILE_PATH + delim, "")}
                 )
                 continue
-            videos["local"].append({"isImage": False, "url": p.replace(FILE_PATH, "")})
+            videos["local"].append({"isImage": False, "url": p.replace(FILE_PATH + delim, "")})
         else:
             videos["online"].append(getEmbedUrl(p))
 

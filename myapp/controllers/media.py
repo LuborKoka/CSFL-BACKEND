@@ -1,6 +1,7 @@
 from django.http import HttpResponse, HttpResponseBadRequest, FileResponse
 from ..models import Tracks
 from .report import FILE_PATH
+import os
 
 print(FILE_PATH)
 
@@ -22,8 +23,9 @@ def raceImage(trackID: str):
 
 
 def media(name: str, folder: str):
+    delim = os.sep
     video_path = (
-        FILE_PATH + name if folder is None else FILE_PATH + folder + "\\" + name
+        FILE_PATH + delim + name if folder is None else FILE_PATH + delim + folder + delim + name
     )
 
     response = FileResponse(open(video_path, "rb"))
