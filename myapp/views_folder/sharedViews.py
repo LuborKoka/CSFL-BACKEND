@@ -9,6 +9,7 @@ from ..controllers.seasons import getAllSeasons
 from ..controllers.credentials import isUserPermitted
 from ..controllers.driverLineUp import getTeamDrivers, postTeamDrivers
 from ..controllers.authentication import getUserRoles
+from ..controllers.rules import getRules
 
 # api/roles/<str:user_id>/
 @csrf_exempt
@@ -70,3 +71,10 @@ def seasonDrivers(req: HttpRequest, season_id: str):
         return postTeamDrivers(season_id, json.loads(req.body)["params"])
 
     return HttpResponseNotFound()
+
+
+def rules(req: HttpRequest):
+    if req.method == "GET":
+        return getRules()
+    
+    

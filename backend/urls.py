@@ -49,6 +49,7 @@ urlpatterns = [
         # vytvorenie pretekov sezony, ziskanie jej pretekov, uprava a vymazanie (toto uz plati pre samotnu sezonu, nie jej preteky, na upravu pretekov bude iny endpoint)
     ),  # scheduleRelated.py; zlucene
     path("api/season-drivers/<str:season_id>/", sharedViews.seasonDrivers),
+    path("api/rules/", sharedViews.rules),
     path("api/admins/create-season/", adminViews.createSeasonView),  # seasons.py
     path(
         "api/admins/season-drivers/<str:season_id>/reserves/", adminViews.seasonReserves
