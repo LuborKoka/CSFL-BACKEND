@@ -158,3 +158,4 @@ assets/
 Dockerfile
 docker-compose.yml
 .dockerignore
+*.zip
