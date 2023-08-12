@@ -3,6 +3,7 @@ from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFo
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from manage import PATH
 from typing import ItemsView, TypedDict
+from datetime import datetime
 
 class patch_params(TypedDict):
     rules: str
@@ -15,10 +16,11 @@ def getRules():
         file = open(path, 'r', encoding='UTF-8')
 
         content = file.read()
-
         file.close()
 
-        return HttpResponse(json.dumps({"rules": content}), status=200)
+        modified_at = datetime.fromtimestamp(os.path.getmtime(path)).strftime('%d. %m. 20%y')
+
+        return HttpResponse(json.dumps({"rules": content, "modifiedAt": modified_at}), status=200)
     
     except FileNotFoundError:
         return HttpResponseNotFound()
