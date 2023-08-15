@@ -1,9 +1,10 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.db.models import Prefetch
 from django.db import connection
-from ..models import Reports, ReportTargets
+from ..models import Reports, ReportTargets, UsersRoles, Roles
 from typing import TypedDict, List
 import json
+from ..discord.discordIntegration import notify_discord_on_report
 
 
 class Penalty(TypedDict):
@@ -44,7 +45,15 @@ def getConcernedDrivers(reportID):
 
 def postVerdict(reportID: str, params: NewVerdict):
     try:
-        report = Reports.objects.get(id=reportID)
+        report = Reports.objects.select_related('race').get(id=reportID)
+
+        user_role = UsersRoles.objects.select_related('role').filter(role__name=f'{report.race.season.name}fia')
+
+        if len(user_role) == 0:
+            return HttpResponseForbidden(json.dumps({
+                "error": "Prístup zamietnutý. Ak si prihlásený, už to neskúšaj."
+            }))
+
         report.verdict = params["content"]
         report.save()
 
@@ -65,7 +74,7 @@ def postVerdict(reportID: str, params: NewVerdict):
                 data,
             )
 
-        return HttpResponse(status=204)
+        return notify_discord_on_report(reportID, True)
 
     except Exception as e:
         print(e)
