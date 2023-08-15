@@ -7,8 +7,9 @@ from django.db.models import Prefetch
 from typing import TypedDict, List
 from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races
 from urllib.parse import urlparse, parse_qs
-import imghdr, os, time, json
+import imghdr, os, time, json, traceback
 from datetime import datetime, timedelta, timezone
+from ..discord.discordIntegration import notify_discord_on_report
 
 FILE_PATH = os.path.join(PATH, "media")
 FILE_PATH_DELIM = "++"
@@ -34,19 +35,20 @@ def reportUpload(
     # if datum neni medzi zaciatkom koncom,
     race = Races.objects.get(id=raceID)
 
+    #tie zony su napicu, treba doladit
     endTime = (race.date + timedelta(days=1)).replace(hour=23, minute=59, second=59)
     print(endTime)
     local_offset = timezone(timedelta(seconds=-time.timezone))
     print(datetime.now(local_offset))
-    if race.date > datetime.now(local_offset):
-        return HttpResponseBadRequest(
-            json.dumps({"error": "Ešte je na posielanie reportov skoro."})
-        )
-
-    if datetime.now(local_offset) > endTime:
-        return HttpResponseForbidden(
-            json.dumps({"error": "Čas na posielanie reportov už vypršal."})
-        )
+    # if race.date > datetime.now(local_offset):
+    #     return HttpResponseBadRequest(
+    #         json.dumps({"error": "Ešte je na posielanie reportov skoro."})
+    #     )
+# 
+    # if datetime.now(local_offset) > endTime:
+    #     return HttpResponseForbidden(
+    #         json.dumps({"error": "Čas na posielanie reportov už vypršal."})
+    #     )
 
     form = json.loads(form)
     video_paths = []
@@ -68,10 +70,10 @@ def reportUpload(
                 report,
             )
 
-            id = c.fetchone()[0]
+            report_id = c.fetchone()[0]
 
             for t in form["targets"]:
-                data = [None if t == "hra" else t, id]
+                data = [None if t == "hra" else t, report_id]
                 c.execute(
                     """
                     INSERT INTO report_targets (driver_id, report_id)
@@ -80,9 +82,11 @@ def reportUpload(
                     data,
                 )
 
-    except Exception as e:
-        print(e)
-        return HttpResponseBadRequest()
+    except Exception:
+        traceback.print_exc()
+        return HttpResponseBadRequest(json.dumps({
+            "error": "Niečo sa pokazilo. Skús report odoslať znova."
+        }))
 
     for v in form["video"]:
         video_paths.append(v)
@@ -94,15 +98,17 @@ def reportUpload(
                 dst.write(chunk)
 
     try:
-        report = Reports.objects.get(id=id)
+        report = Reports.objects.get(id=report_id)
         report.video_path = FILE_PATH_DELIM.join(video_paths)
         report.save()
 
-        return HttpResponse(status=204)
+        return notify_discord_on_report(report_id, False)
 
     except Exception as e:
         print(e)
-        return HttpResponseBadRequest()
+        return HttpResponseBadRequest(json.dumps({
+            "error": "Niečo sa pokazilo. Skús report odoslať znova."
+        }))
 
 
 def getReports(raceID: str):
@@ -187,7 +193,7 @@ def getReports(raceID: str):
         return HttpResponse(json.dumps(result), status=200)
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 

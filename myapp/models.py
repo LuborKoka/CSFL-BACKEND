@@ -156,6 +156,36 @@ class AuthUserUserPermissions(models.Model):
 
 
 
+class DiscordAccounts(models.Model):
+
+    id = models.UUIDField(primary_key=True)
+
+    discord_id = models.BigIntegerField(unique=True)
+
+    discord_username = models.CharField(unique=True, max_length=32)
+
+    discord_global_name = models.CharField(unique=True, max_length=32)
+
+    discord_avatar = models.TextField(blank=True, null=True)
+
+    expires_at = models.DateTimeField()
+
+    user = models.ForeignKey('Users', models.DO_NOTHING, blank=True, null=True)
+
+    refresh_token = models.TextField(blank=True, null=True)
+
+
+
+    class Meta:
+
+        managed = False
+
+        db_table = 'discord_accounts'
+
+
+
+
+
 class DjangoAdminLog(models.Model):
 
     action_time = models.DateTimeField()
@@ -398,7 +428,7 @@ class Reports(models.Model):
 
     content = models.TextField()
 
-    video_path = models.TextField()
+    video_path = models.TextField(blank=True, null=True)
 
     from_driver = models.ForeignKey(Drivers, models.DO_NOTHING, db_column='from_driver')
 
@@ -520,6 +550,8 @@ class Tracks(models.Model):
 
     race_name = models.TextField()
 
+    emoji = models.CharField(max_length=9, blank=True, null=True)
+
 
 
     class Meta:
@@ -541,6 +573,8 @@ class Users(models.Model):
     password = models.BinaryField()
 
     driver = models.OneToOneField(Drivers, models.DO_NOTHING, blank=True, null=True)
+
+    discord_account = models.ForeignKey(DiscordAccounts, models.DO_NOTHING, blank=True, null=True)
 
 
 

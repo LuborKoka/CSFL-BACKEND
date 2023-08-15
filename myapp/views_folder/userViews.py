@@ -15,6 +15,7 @@ from ..controllers.verdict import (
 )
 from ..controllers.report import postReportResponse, getReports, reportUpload
 from ..controllers.authentication import userSignUp, userLogIn, changePassword
+from ..discord.discordIntegration import saveUserDiscord
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
@@ -25,6 +26,10 @@ def signup(req: HttpRequest):
     if req.method == "POST":
         data = json.loads(req.body)
         return userSignUp(data["params"], SECRET_KEY)
+    
+    if req.method == "PUT":
+        return saveUserDiscord(json.loads(req.body)["params"])
+
 
     return HttpResponseNotFound()
 
