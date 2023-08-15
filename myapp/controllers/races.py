@@ -8,7 +8,7 @@ from django.db import connection, transaction
 from ..models import Races, RacesDrivers, SeasonsDrivers, Teams
 import json
 from typing import TypedDict, List
-from ..controllers.time import gap_to_time, time_to_seconds
+from .timeFormatting import gap_to_time, time_to_seconds, time_to_gap
 import traceback
 
 
@@ -103,12 +103,9 @@ def getEditRace(raceID: str):
             for t in teams:
                 team_drivers = []
 
-                print(t.name)
-
                 for d in drivers:
                     if d.team.id == t.id:
                         team_drivers.append(str(d.driver.id))
-                        print(d.driver.name)
 
                 team = {
                     "teamID": str(t.id),
@@ -220,14 +217,21 @@ def getEditRaceResults(raceID: str):
     try:
         drivers = RacesDrivers.objects.filter(race_id=raceID).select_related(
             "driver", "team"
-        )
+        ).order_by('time', 'team__name')
 
         result = {"drivers": []}
 
-        for d in drivers:
-            result["drivers"].append(
-                {"id": str(d.driver.id), "name": d.driver.name, "color": d.team.color}
-            )
+        if len(drivers) > 0:
+            leader_time = drivers[0].time
+
+            if leader_time is not None:
+                fl_driver = RacesDrivers.objects.select_related('driver').get(race_id = raceID, has_fastest_lap = True)
+                result["fastestLap"] = {"driverID": str(fl_driver.driver.id), "driverName": fl_driver.driver.name}
+
+            for d in drivers:
+                result["drivers"].append(
+                    {"id": str(d.driver.id), "name": d.driver.name, "color": d.team.color, "time": time_to_gap(leader_time, d.time)}
+                )
 
         return HttpResponse(json.dumps(result), status=200)
 
@@ -246,19 +250,28 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
     }
 
     # zapis vitaza pretekov
-    try:
-        with connection.cursor() as c:
-            c.execute(
-                """
-                UPDATE races_drivers 
-                SET time = %s
-                WHERE driver_id = %s AND race_id = %s
-                RETURNING driver_id
-                """,
-                [leader["time"], leader["id"], raceID],
-            )
+    c = connection.cursor()
 
-            c.fetchone()[0]
+    try:
+         # premaze existujuce najrychlejsie kolo zavodu, pre pripad, ze sa znova zapisuju vysledky
+        fl_driver = RacesDrivers.objects.get(race_id=raceID, has_fastest_lap = True)
+        fl_driver.has_fastest_lap = False
+        fl_driver.save()
+    except RacesDrivers.DoesNotExist:
+        pass
+
+    try:
+        c.execute(
+            """
+            UPDATE races_drivers 
+            SET time = %s
+            WHERE driver_id = %s AND race_id = %s
+            RETURNING driver_id
+            """,
+            [leader["time"], leader["id"], raceID],
+        )
+
+        c.fetchone()[0]
     except Exception as e:
         print(e)
         return HttpResponseNotFound()
@@ -269,15 +282,14 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
             [gap_to_time(leader["time"], d["time"]), d["plusLaps"], raceID, d["id"]]
         )
     try:
-        with connection.cursor() as c:
-            c.executemany(
-                """
-                UPDATE races_drivers
-                SET time = %s, plus_laps = %s
-                WHERE race_id = %s AND driver_id = %s
-                """,
-                data,
-            )
+        c.executemany(
+            """
+            UPDATE races_drivers
+            SET time = %s, plus_laps = %s
+            WHERE race_id = %s AND driver_id = %s
+            """,
+            data,
+        )
 
         driver = RacesDrivers.objects.get(
             driver_id=params["results"]["fastestLap"], race_id=raceID
