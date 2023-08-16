@@ -1,7 +1,6 @@
 from typing import List, TypedDict
-from ..models import UsersRoles, Users, Roles
-from django.http import HttpResponseForbidden
-from django.core.exceptions import ObjectDoesNotExist
+from ..models import UsersRoles
+from django.http import HttpResponseForbidden, HttpRequest
 import jwt
 from ..views_folder.userViews import SECRET_KEY
 
@@ -11,8 +10,17 @@ class DataType(TypedDict):
     id: str
 
 
-# returns true/403 forbidden
-def isUserPermitted(header: str | None, requiredRoles: List[str]):
+
+def isUserPermitted(header: str | None, requiredRoles: List[str]) -> bool | HttpResponseForbidden:
+    """
+    A function to check user permissions for certain actions.
+    
+    Returns:
+        True if user is permitted
+
+        HttpResponseForbidden if not
+    """
+
     if header == "":
         return HttpResponseForbidden()
 
