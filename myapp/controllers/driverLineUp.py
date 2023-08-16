@@ -23,6 +23,12 @@ class Team(TypedDict):
 
 
 def getTeamDrivers(seasonID: str):
+    """
+    driverLineUp.py
+    
+    Returns:
+        An array of all teams and their drivers.
+    """
     c = connection.cursor()
 
     result = {"teams": [], "availableDrivers": [], "reserves": []}
@@ -51,6 +57,8 @@ def getTeamDrivers(seasonID: str):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+    
+    isEmptyLineUp = True
 
     try:
         teams = Teams.objects.all().order_by("name")
@@ -62,6 +70,7 @@ def getTeamDrivers(seasonID: str):
             teamDrivers = []
             for d in drivers:
                 teamDrivers.append({"id": str(d.driver.id), "name": d.driver.name})
+                isEmptyLineUp = False
 
             result["teams"].append(
                 {
@@ -72,6 +81,9 @@ def getTeamDrivers(seasonID: str):
                     "image": t.logo,
                 }
             )
+
+        if isEmptyLineUp:
+            result['isEmptyLineUp'] = True
 
     except Exception as e:
         print(e)
