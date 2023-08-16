@@ -112,6 +112,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.100.22:3000",
+    "http://localhost:3000"
 ]
 
 # Add or modify this setting
@@ -122,7 +123,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = 'Europe/Budapest'
 
 USE_I18N = True
 
