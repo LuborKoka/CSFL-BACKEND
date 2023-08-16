@@ -234,7 +234,7 @@ def getStandings(seasonID: str):
             c.execute(
                 """
                     WITH penalty_points AS (
-                        SELECT  driver_id, r.race_id, report_id, points, rank
+                        SELECT  driver_id, r.race_id, report_id, points
                         FROM (
                             SELECT penalty_points, p.driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points,
 								ROW_NUMBER() OVER (PARTITION BY r.race_id, driver_id) AS rank
@@ -244,24 +244,25 @@ def getStandings(seasonID: str):
                             WHERE penalty_points > 0
                         ) AS p
                         JOIN reports AS r ON r.id = p.report_id
-						WHERE rank = 1
+						WHERE p.rank = 1
                         ORDER BY driver_id
                     )
 
-                    SELECT d.id, d.name, points, COALESCE(SUM(points) OVER (PARTITION BY d.id), 0) AS points_total
+                    SELECT d.id, d.name, points, COALESCE(SUM(points) OVER (PARTITION BY d.id), 0) AS points_total, t.icon
                     FROM seasons_drivers AS sd
                     JOIN races AS r ON r.season_id = sd.season_id
                     JOIN tracks AS tr ON tr.id = r.track_id
                     JOIN drivers AS d ON d.id = sd.driver_id
                     LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
                     LEFT JOIN penalty_points AS p ON sd.driver_id = p.driver_id AND r.id = p.race_id
+                    LEFT JOIN teams AS t ON sd.team_id = t.id
                     WHERE sd.season_id = %s
                     ORDER BY d.id, r.date
                 """,
                 [seasonID],
             )
 
-            # [0: driver_id, 1: driver_name, 2: points, 3: points_total]
+            # [0: driver_id, 1: driver_name, 2: points, 3: points_total, 4: team_icon]
 
             penData = c.fetchall()
 
@@ -270,6 +271,7 @@ def getStandings(seasonID: str):
                     "id": str(penData[i * raceCount][0]),
                     "name": penData[i * raceCount][1],
                     "totalPoints": int(penData[i * raceCount][3]),
+                    "teamIcon": penData[i * raceCount][4],
                     "races": [],
                 }
 
