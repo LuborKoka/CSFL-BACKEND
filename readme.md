@@ -217,6 +217,6 @@ ORDER BY result_time ASC
 
 # Sprinty
 
-Doteraz nevyriesene  
+Uz vyriesene presne tak, ako je popisane
 Je moznost odstranit tabulku sprints. Do races_drivers pridat stlpec is_sprint, tym padom by kazdy sprint
 bol povazovany za samostatne preteky, len s inym bodovanim. Treba potom doriesit zobrazovanie a reporty k tomu.
