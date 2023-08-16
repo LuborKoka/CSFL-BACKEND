@@ -234,15 +234,17 @@ def getStandings(seasonID: str):
             c.execute(
                 """
                     WITH penalty_points AS (
-                        SELECT DISTINCT ON(driver_id) driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points
+                        SELECT  driver_id, r.race_id, report_id, points, rank
                         FROM (
-                            SELECT penalty_points, p.driver_id, r.race_id, report_id
+                            SELECT penalty_points, p.driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points,
+								ROW_NUMBER() OVER (PARTITION BY r.race_id, driver_id) AS rank
                             FROM penalties AS p
                             JOIN reports AS r ON r.id = p.report_id
                             JOIN drivers AS d ON d.id = p.driver_id
                             WHERE penalty_points > 0
                         ) AS p
                         JOIN reports AS r ON r.id = p.report_id
+						WHERE rank = 1
                         ORDER BY driver_id
                     )
 

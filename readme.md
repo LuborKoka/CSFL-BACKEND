@@ -164,19 +164,21 @@ Query pre trestne body:
 
 ```sql
 WITH penalty_points AS (
-	SELECT DISTINCT ON(driver_id) driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points
+	SELECT  driver_id, r.race_id, report_id, points, rank
 	FROM (
-		SELECT penalty_points, p.driver_id, r.race_id, report_id
+		SELECT penalty_points, p.driver_id, r.race_id, report_id, SUM(penalty_points) OVER (PARTITION BY r.race_id, driver_id) AS points,
+			ROW_NUMBER() OVER (PARTITION BY r.race_id, driver_id) AS rank
 		FROM penalties AS p
 		JOIN reports AS r ON r.id = p.report_id
 		JOIN drivers AS d ON d.id = p.driver_id
 		WHERE penalty_points > 0
 	) AS p
 	JOIN reports AS r ON r.id = p.report_id
+	WHERE rank = 1
 	ORDER BY driver_id
 )
 
-SELECT d.id, d.name, tr.flag, r.id, report_id, points, COALESCE(SUM(points) OVER (PARTITION BY d.id), 0) AS points_total
+SELECT d.id, d.name, points, COALESCE(SUM(points) OVER (PARTITION BY d.id), 0) AS points_total
 FROM seasons_drivers AS sd
 JOIN races AS r ON r.season_id = sd.season_id
 JOIN tracks AS tr ON tr.id = r.track_id
@@ -184,6 +186,7 @@ JOIN drivers AS d ON d.id = sd.driver_id
 LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
 LEFT JOIN penalty_points AS p ON sd.driver_id = p.driver_id AND r.id = p.race_id
 WHERE sd.season_id = %s
+ORDER BY d.id, r.date
 ```
 
 V `races.py` getRaceResults:
