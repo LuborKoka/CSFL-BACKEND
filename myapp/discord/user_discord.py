@@ -1,6 +1,7 @@
 from ..models import Users, DiscordAccounts
-from django.http import HttpResponse, HttpResponseServerError, HttpResponseBadRequest
-from django.db import connection
+from django.http import HttpResponse, HttpResponseServerError, HttpResponseBadRequest, HttpResponseNotFound
+from django.db import connection, IntegrityError
+from django.core.exceptions import ObjectDoesNotExist
 from typing import TypedDict
 import traceback, json, os, requests
 
@@ -24,18 +25,22 @@ def save_user_discord(params: UserDiscordParams):
     try:
         access_token_response = exchange_code(params['code'])
         user_data = get_user_data(access_token_response['access_token'])
+        print(user_data)
     except Exception:
         return HttpResponseServerError(json.dumps({"error": "Nepodarilo sa získať dáta z discordu."}))
 
     c = connection.cursor()
 
-    database_data = [user_data['id'], user_data['username'], user_data['global_name'], user_data['avatar'], access_token_response['expires_in'], access_token_response['refresh_token'], params['userID']]
+    premium_type = user_data['premium_type'] if user_data['premium_type'] is not None else 0
+
+    database_data = [user_data['id'], user_data['username'], user_data['global_name'], user_data['avatar'], access_token_response['expires_in'], 
+        access_token_response['refresh_token'], params['userID'], premium_type]
 
     try:
         c.execute("""
-            INSERT INTO discord_accounts (discord_id, discord_username, discord_global_name, discord_avatar, expires_at, refresh_token, user_id)
+            INSERT INTO discord_accounts (discord_id, discord_username, discord_global_name, discord_avatar, expires_at, refresh_token, user_id, premium_type)
             VALUES
-                (%s, %s, %s, %s, NOW() + make_interval(secs := %s), %s, %s)
+                (%s, %s, %s, %s, NOW() + make_interval(secs := %s), %s, %s, %s)
             RETURNING id
         """, database_data)
 
@@ -49,11 +54,67 @@ def save_user_discord(params: UserDiscordParams):
 
         return HttpResponse(status=204)
         
+    except IntegrityError:
+        return HttpResponseBadRequest(json.dumps({
+            "error": "Tento Discord účet už niekto používa."
+        }))
+
     except Exception:
         traceback.print_exc()
         return HttpResponseServerError(json.dumps({
             "error": "Nepodarilo sa prepojiť tvoj discord účet."
         }))
+
+
+def get_user_discord(userID: str):
+    try:
+        user = Users.objects.select_related('discord_account').get(id = userID)
+
+    except ObjectDoesNotExist:
+        return HttpResponseNotFound(json.dumps({
+            "error": "Tento účet sa nenašiel. Skús sa znovu prihlásiť."
+        }))
+
+    except Exception:
+        return HttpResponseServerError(json.dumps({
+            "error": "Niečo sa pokazilo, skús to znova."
+        }))
+
+    
+    if user.discord_account is None:
+        return HttpResponse(status=204)
+
+    result = {
+        "discord_id": user.discord_account.discord_id,
+        "discord_username": user.discord_account.discord_username,
+        "discord_global_name": user.discord_account.discord_global_name,
+        "avatar": user.discord_account.discord_avatar,
+        "premium_type": user.discord_account.premium_type
+    }
+
+    return HttpResponse(json.dumps(result), status=200)
+
+
+def delete_user_discord(userID: str):
+    try:
+        user = Users.objects.select_related('discord_account').get(id = userID)
+
+    except ObjectDoesNotExist:
+        return HttpResponseNotFound(json.dumps({
+            "error": "Takýto účet sme nenašli, skús sa znova prihlásiť."
+        }))
+    
+    except Exception:
+        return HttpResponseServerError(json.dumps({
+            "error": "Niečo sa pokazilo, skús to znova."
+        }))
+    
+    dc_acc = user.discord_account
+    user.discord_account = None
+    user.save()
+    dc_acc.delete()
+
+    return HttpResponse(status=204)
 
 
 

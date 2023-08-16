@@ -81,7 +81,7 @@ Viac info [na tomto odkaze](http://192.168.100.22:3000/seasons/{report_data[4]}/
 ### Pridané rozhodnutie
 
 Účastníci:
-    - {reporting_driver_name}
+- {reporting_driver_name}
 {tagReportTargets(reportID)}
 
 Viac info [na tomto odkaze](http://192.168.100.22:3000/seasons/{report_data[4]}/race/{report_data[5]}/reports)

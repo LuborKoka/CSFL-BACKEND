@@ -1,8 +1,5 @@
 from django.db import connection
-from django.http import (
-    HttpResponseNotFound,
-    HttpRequest,
-)
+from django.http import HttpResponseNotFound, HttpRequest
 import json
 from django.views.decorators.csrf import csrf_exempt
 from ..controllers.standings import getStandings
@@ -15,10 +12,15 @@ from ..controllers.verdict import (
 )
 from ..controllers.report import postReportResponse, getReports, reportUpload
 from ..controllers.authentication import userSignUp, userLogIn, changePassword
-from ..discord.discordIntegration import saveUserDiscord
+from ..discord.discordIntegration import saveUserDiscord, getUserDiscord, deleteUserDiscord
+from ..controllers.authentication import csrf_token
 import os, binascii, base64
 
 SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
+
+def getCSRFToken(req: HttpRequest):
+    if req.method == "GET":
+        return csrf_token(req)
 
 
 @csrf_exempt  # api/signup/
@@ -32,6 +34,18 @@ def signup(req: HttpRequest):
 
 
     return HttpResponseNotFound()
+
+# api/user-discord/<str:user_id>/
+@csrf_exempt
+def userDiscord(req: HttpRequest, user_id: str):
+    if req.method == "GET":
+        return getUserDiscord(user_id)
+
+    if req.method == "POST":
+        return saveUserDiscord(json.loads(req.body)["params"])
+    
+    if req.method == "DELETE":
+        return deleteUserDiscord(user_id)
 
 
 @csrf_exempt  # api/login/

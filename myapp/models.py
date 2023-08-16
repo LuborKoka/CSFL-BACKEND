@@ -174,6 +174,8 @@ class DiscordAccounts(models.Model):
 
     refresh_token = models.TextField(blank=True, null=True)
 
+    premium_type = models.IntegerField()
+
 
 
     class Meta:
