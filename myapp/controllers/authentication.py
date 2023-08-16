@@ -1,11 +1,8 @@
 from typing import TypedDict
-from django.http import (
-    HttpResponse,
-    HttpResponseBadRequest,
-    HttpResponseNotFound,
-    HttpResponseServerError,
-)
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, HttpResponseServerError, HttpRequest, JsonResponse
 from django.db import connection, IntegrityError, transaction
+from django.middleware.csrf import get_token
+from django.core.exceptions import ObjectDoesNotExist
 import bcrypt
 import jwt
 import json
@@ -103,6 +100,7 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             "username": params["username"],
             "id": str(user[0]),
             "exp": datetime.utcnow() + timedelta(days=7),
+            "driverID": str(driver["id"])
         }
 
         token = jwt.encode(payload=payload, key=SECRET_KEY)
@@ -138,16 +136,12 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
 def userLogIn(params: logInParmas, SECRET_KEY: str):
     user = None
     try:
-        user: User = (
-            Users.objects.filter(username=params["username"])
-            .values("password", "id")
-            .first()
-        )
-
-        if not user:
-            data = json.dumps({"error": "Nesprávne meno alebo heslo"})
-            time.sleep(1.5)
-            return HttpResponse(data, status=401)
+        user = Users.objects.select_related('driver').get(username=params["username"])
+                
+    except ObjectDoesNotExist:
+        data = json.dumps({"error": "Nesprávne meno alebo heslo"})
+        time.sleep(1.5)
+        return HttpResponse(data, status=401)
 
     except Exception as e:
         print(e)
@@ -156,17 +150,18 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
 
     if bcrypt.checkpw(
         password=params["password"].encode("UTF-8"),
-        hashed_password=bytes(user["password"]),
+        hashed_password=bytes(user.password),
     ):
         payload = {
             "username": params["username"],
-            "id": str(user["id"]),
+            "id": str(user.id),
             "exp": datetime.utcnow() + timedelta(days=7),
+            "driverID": str(user.driver.id)
         }
         token = jwt.encode(payload=payload, key=SECRET_KEY)
 
         result = {"token": token, "roles": []}
-        roles = UsersRoles.objects.filter(user_id=user["id"]).select_related("role")
+        roles = UsersRoles.objects.filter(user_id=user.id).select_related("role")
         for r in roles:
             result["roles"].append(r.role.name)
 
@@ -230,3 +225,11 @@ def changePassword(params: changePasswordParams):
     except Exception as e:
         print(e)
         return HttpResponseBadRequest()
+
+
+def csrf_token(req: HttpRequest):
+    token = get_token(req)
+    response = JsonResponse({'csrf_token': token})
+    # response["Access-Control-Allow-Origin"] = "https://your-react-app-domain.com"
+    response["Access-Control-Allow-Credentials"] = "true"
+    return response
