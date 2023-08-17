@@ -25,6 +25,7 @@ def save_user_discord(params: UserDiscordParams):
     try:
         access_token_response = exchange_code(params['code'])
         user_data = get_user_data(access_token_response['access_token'])
+        print(access_token_response)
         print(user_data)
     except Exception:
         return HttpResponseServerError(json.dumps({"error": "Nepodarilo sa získať dáta z discordu."}))
@@ -34,13 +35,14 @@ def save_user_discord(params: UserDiscordParams):
     premium_type = user_data['premium_type'] if user_data['premium_type'] is not None else 0
 
     database_data = [user_data['id'], user_data['username'], user_data['global_name'], user_data['avatar'], access_token_response['expires_in'], 
-        access_token_response['refresh_token'], params['userID'], premium_type]
+        access_token_response['refresh_token'], params['userID'], premium_type, user_data['accent_color'], user_data['banner'], 
+        user_data['banner_color'], user_data['avatar_decoration']]
 
     try:
         c.execute("""
-            INSERT INTO discord_accounts (discord_id, discord_username, discord_global_name, discord_avatar, expires_at, refresh_token, user_id, premium_type)
+            INSERT INTO discord_accounts (discord_id, discord_username, discord_global_name, discord_avatar, expires_at, refresh_token, user_id, premium_type, accent_color, banner, banner_color, avatar_decoration)
             VALUES
-                (%s, %s, %s, %s, NOW() + make_interval(secs := %s), %s, %s, %s)
+                (%s, %s, %s, %s, NOW() + make_interval(secs := %s), %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, database_data)
 
@@ -67,6 +69,9 @@ def save_user_discord(params: UserDiscordParams):
 
 
 def get_user_discord(userID: str):
+    if userID == 'undefined':
+        return HttpResponseNotFound()
+
     try:
         user = Users.objects.select_related('discord_account').get(id = userID)
 
