@@ -27,7 +27,7 @@ res_with_points AS (
 			WHEN rd.time IS NULL THEN 0
 			ELSE
 				CASE
-					WHEN r.is_sprint = TRUE THEN
+					WHEN r.is_sprint = TRUE THEN 
 						CASE
 							WHEN re.rank = 1 THEN 8
 							WHEN re.rank = 2 THEN 7
@@ -39,7 +39,7 @@ res_with_points AS (
 							WHEN re.rank = 8 THEN 1
 							ELSE 0
 						END
-					ELSE
+					ELSE 
 						CASE
 							WHEN re.rank = 1 THEN 25
 							WHEN re.rank = 2 THEN 18
@@ -58,9 +58,7 @@ res_with_points AS (
 					WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
 					ELSE 0
 				END
-		END AS points,
-		r.id AS race_id,
-		tr.id AS track_id
+		END AS points, r.id AS race_id, tr.id AS track_id, t.color
 	FROM seasons_drivers AS sd
 	JOIN races AS r ON r.season_id = sd.season_id
 	JOIN tracks AS tr ON tr.id = r.track_id
@@ -70,8 +68,10 @@ res_with_points AS (
 	LEFT JOIN results AS re ON rd.driver_id = re.driver_id AND rd.race_id = re.race_id
 	WHERE sd.season_id = %s
 )
+
+
 SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
-	NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint DESC
+	NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint
 FROM res_with_points AS rwp
 JOIN races AS r ON rwp.race_id = r.id
 ORDER BY points_total DESC, driver_name, rwp.date, r.is_sprint DESC
