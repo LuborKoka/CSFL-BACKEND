@@ -89,8 +89,9 @@ def get_user_discord(userID: str):
     if user.discord_account is None:
         return HttpResponse(status=204)
 
+
     result = {
-        "discord_id": user.discord_account.discord_id,
+        "discord_id": str(user.discord_account.discord_id),
         "discord_username": user.discord_account.discord_username,
         "discord_global_name": user.discord_account.discord_global_name,
         "avatar": user.discord_account.discord_avatar,
@@ -145,4 +146,15 @@ def get_user_data(access_token: str):
     }
     response = requests.get('%s/users/@me' % DISCORD_API_URI, headers=headers)
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+
+    result = {"id": data["id"], "username": data["username"]}
+    result["global_name"] = data["global_name"] if "global_name" in data else None
+    result["avatar"] = data["avatar"] if "avatar" in data else None
+    result["avatar_decoration"] = data["avatar_decoration_data"] if "avatar_decoration_data" in data else None
+    result["banner"] = data["banner"] if "banner" in data else None
+    result["banner_color"] = data["banner_color"] if "banner_color" in data else None
+    result["accent_color"] = data["accent_color"] if "accent_color" in data else None
+    result["premium_type"] = data['premium_type'] if "premium_type" in data else 0
+
+    return result

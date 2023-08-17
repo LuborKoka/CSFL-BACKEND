@@ -100,7 +100,8 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             "username": params["username"],
             "id": str(user[0]),
             "exp": datetime.utcnow() + timedelta(days=7),
-            "driverID": str(driver["id"])
+            "driverID": str(driver["id"]),
+            "driverName": params["raceName"]
         }
 
         token = jwt.encode(payload=payload, key=SECRET_KEY)
@@ -156,7 +157,8 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
             "username": params["username"],
             "id": str(user.id),
             "exp": datetime.utcnow() + timedelta(days=7),
-            "driverID": str(user.driver.id)
+            "driverID": str(user.driver.id),
+            "driverName": user.driver.name
         }
         token = jwt.encode(payload=payload, key=SECRET_KEY)
 

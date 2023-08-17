@@ -11,9 +11,9 @@ WITH total_pents AS (
 		ORDER BY driver_id, race_id
 ),
 results AS (
-	SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
+	SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
 	FROM (
-		SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint
+		SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint, rd.is_dsq
 		FROM races_drivers AS rd
 		JOIN races AS r ON rd.race_id = r.id
 		LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
@@ -27,7 +27,7 @@ res_with_points AS (
 			WHEN rd.time IS NULL THEN 0
 			ELSE
 				CASE
-					WHEN r.is_sprint = TRUE THEN 
+					WHEN r.is_sprint = TRUE OR re.is_dsq = TRUE THEN 
 						CASE
 							WHEN re.rank = 1 THEN 8
 							WHEN re.rank = 2 THEN 7
@@ -58,7 +58,7 @@ res_with_points AS (
 					WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
 					ELSE 0
 				END
-		END AS points, r.id AS race_id, tr.id AS track_id, t.color
+		END AS points, r.id AS race_id, tr.id AS track_id, t.color, re.is_dsq
 	FROM seasons_drivers AS sd
 	JOIN races AS r ON r.season_id = sd.season_id
 	JOIN tracks AS tr ON tr.id = r.track_id
@@ -98,9 +98,9 @@ WITH total_pents AS (
 		ORDER BY driver_id, race_id
 ),
 ranks AS (
-	SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC), race_id, is_sprint, time
+	SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC), race_id, is_sprint, time, icon, is_dsq
 	FROM (
-		SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint
+		SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint, icon, rd.is_dsq
 		FROM races_drivers AS rd
 		JOIN races AS r ON rd.race_id = r.id
 		JOIN teams AS t ON rd.team_id = t.id
@@ -112,10 +112,10 @@ ranks AS (
 points AS (
 	SELECT *,
 		CASE
-			WHEN time IS NULL THEN 0
+			WHEN time IS NULL OR is_dsq = TRUE THEN 0
 			ELSE
 				CASE
-					WHEN is_sprint = TRUE THEN
+					WHEN is_sprint = TRUE THEN 
 						CASE
 							WHEN rank = 1 THEN 8
 							WHEN rank = 2 THEN 7
@@ -127,7 +127,7 @@ points AS (
 							WHEN rank = 8 THEN 1
 							ELSE 0
 						END
-					ELSE
+					ELSE 
 						CASE
 							WHEN rank = 1 THEN 25
 							WHEN rank = 2 THEN 18
@@ -153,7 +153,7 @@ team_points AS (
 	SELECT DISTINCT ON(team_id) *, SUM(points) OVER (PARTITION BY team_id)
 	FROM points
 )
-SELECT team_id, color, sum AS points, name, ROW_NUMBER() OVER (ORDER BY sum DESC) AS rank
+SELECT team_id, color, sum AS points, name, ROW_NUMBER() OVER (ORDER BY sum DESC) AS rank, icon
 FROM team_points
 ORDER BY sum DESC
 ```

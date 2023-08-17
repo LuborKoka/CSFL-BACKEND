@@ -1,7 +1,7 @@
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.db.models import Prefetch
-from django.db import connection
-from ..models import Reports, ReportTargets, UsersRoles
+from django.db import connection, transaction
+from ..models import Reports, ReportTargets, UsersRoles, RacesDrivers
 from typing import TypedDict, List
 import json
 from ..discord.discordIntegration import notify_discord_on_report
@@ -11,6 +11,7 @@ class Penalty(TypedDict):
     driverID: str
     time: int
     penaltyPoints: int
+    isDSQ: bool
 
 
 class NewVerdict(TypedDict):
@@ -42,7 +43,7 @@ def getConcernedDrivers(reportID):
         print(e)
         return HttpResponseBadRequest()
 
-
+@transaction.atomic
 def postVerdict(reportID: str, params: NewVerdict):
     try:
         report = Reports.objects.select_related('race').get(id=reportID)
@@ -58,12 +59,16 @@ def postVerdict(reportID: str, params: NewVerdict):
         report.save()
 
         if len(params["penalties"]) == 0:
-            return HttpResponse(status=204)
+            return notify_discord_on_report(reportID, True)
 
         data = []
 
         for p in params["penalties"]:
             data.append((p["penaltyPoints"], p["time"], p["driverID"], reportID))
+            if p["isDSQ"]:
+                dr = RacesDrivers.objects.get(driver_id=p["driverID"], race_id=str(report.race.id))
+                dr.is_dsq = True
+                dr.save()
 
         with connection.cursor() as c:
             c.executemany(

@@ -23,9 +23,9 @@ def getStandings(seasonID: str):
                             ORDER BY driver_id, race_id
                     ),
                     results AS (
-                        SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY time asc) AS rank
+                        SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
                         FROM (
-                            SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint
+                            SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint, rd.is_dsq
                             FROM races_drivers AS rd
                             JOIN races AS r ON rd.race_id = r.id
                             LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
@@ -39,7 +39,7 @@ def getStandings(seasonID: str):
                                 WHEN rd.time IS NULL THEN 0
                                 ELSE
                                     CASE
-                                        WHEN r.is_sprint = TRUE THEN 
+                                        WHEN r.is_sprint = TRUE OR re.is_dsq = TRUE THEN 
                                             CASE
                                                 WHEN re.rank = 1 THEN 8
                                                 WHEN re.rank = 2 THEN 7
@@ -70,7 +70,7 @@ def getStandings(seasonID: str):
                                         WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
                                         ELSE 0
                                     END
-                            END AS points, r.id AS race_id, tr.id AS track_id, t.color
+                            END AS points, r.id AS race_id, tr.id AS track_id, t.color, re.is_dsq
                         FROM seasons_drivers AS sd
                         JOIN races AS r ON r.season_id = sd.season_id
                         JOIN tracks AS tr ON tr.id = r.track_id
@@ -83,7 +83,7 @@ def getStandings(seasonID: str):
 
 
                     SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
-                        NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint DESC
+                        NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint
                     FROM res_with_points AS rwp
                     JOIN races AS r ON rwp.race_id = r.id
                     ORDER BY points_total DESC, driver_name, rwp.date, r.is_sprint DESC
@@ -99,10 +99,10 @@ def getStandings(seasonID: str):
             if len(data) == 0:
                 return HttpResponse(status=204)
 
-            raceCount = data[0][14]
+            raceCount = data[0][15]
 
             # [0: driver_id, 1: driver_name, 2: is_reserve, 3: flag, 4: team_name, 5: time, 6: has_fastest_lap, 7: rank,
-            # 8: date, 9: points, 10: race_id, 11: track_id, 12: color, 13: points_total, 14: race_count, 15: has_been_raced]
+            # 8: date, 9: points, 10: race_id, 11: track_id, 12: color, 13: is_dsq, 14: points_total, 15: race_count, 16: has_been_raced, 17: is_sprint]
 
             for i in range(raceCount):
                 result["races"].append(
@@ -118,7 +118,7 @@ def getStandings(seasonID: str):
                     "driverID": str(data[i * raceCount][0]),
                     "driverName": data[i * raceCount][1],
                     "isReserve": data[i * raceCount][2],
-                    "totalPoints": data[i * raceCount][13],
+                    "totalPoints": data[i * raceCount][14],
                     "color": data[i * raceCount][12],
                     "races": [],
                 }
@@ -128,14 +128,14 @@ def getStandings(seasonID: str):
                         {
                             "teamName": data[i * raceCount + ii][4],
                             "hasFastestLap": data[i * raceCount + ii][6],
-                            "rank": getDnsDnfRank(
+                            "rank": 'DSQ' if data[i * raceCount + ii][13] else getDnsDnfRank(
                                 data[i * raceCount + ii][2],
                                 data[i * raceCount + ii][5],
                                 data[i * raceCount + ii][4],
                                 data[i * raceCount + ii][7],
                             ),
                             "points": data[i * raceCount + ii][9],
-                            "hasBeenRaced": data[i * raceCount + ii][15],
+                            "hasBeenRaced": data[i * raceCount + ii][16],
                         }
                     )
 
@@ -154,9 +154,9 @@ def getStandings(seasonID: str):
                             ORDER BY driver_id, race_id
                     ),
                     ranks AS (
-                        SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY time ASC), race_id, is_sprint, time, icon
+                        SELECT team_id, name, color, has_fastest_lap, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC), race_id, is_sprint, time, icon, is_dsq
                         FROM (
-                            SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint, icon
+                            SELECT team_id, t.name, t.color, has_fastest_lap, rd.time + COALESCE(tp.sum, 0) AS time, rd.race_id, r.is_sprint, icon, rd.is_dsq
                             FROM races_drivers AS rd
                             JOIN races AS r ON rd.race_id = r.id
                             JOIN teams AS t ON rd.team_id = t.id
@@ -168,7 +168,7 @@ def getStandings(seasonID: str):
                     points AS (
                         SELECT *,
                             CASE
-                                WHEN time IS NULL THEN 0
+                                WHEN time IS NULL OR is_dsq = TRUE THEN 0
                                 ELSE
                                     CASE
                                         WHEN is_sprint = TRUE THEN 
@@ -292,6 +292,20 @@ def getStandings(seasonID: str):
 
 
 def getDnsDnfRank(isReserve: bool, time: float | None, teamName: str | None, rank: int):
+    """
+    A function to determine the displayed rank of a driver in the standings table. 
+
+    Returns:
+
+        if is reserve and did not race then ''
+
+        if is not reserve and did not race then 'DNS'
+
+        if didnt finish then 'DNS'
+
+        else returns finish position
+    """
+
     if isReserve and teamName == None:
         return ""
 
