@@ -23,6 +23,7 @@ from ..controllers.scheduleRelated import (
     deleteFromSchedule,
 )
 from ..controllers.credentials import isUserPermitted
+from ..controllers.users_roles import get_users, add_user_role, delete_user_role
 
 # content:
 #   seasons or drivers
@@ -102,7 +103,7 @@ def changeSchedule(req: HttpRequest, season_id: str, race_id: str):
     if permission != True:
         return permission
 
-    if req.method == "PATCH":  # upravenie velkej ceny
+    if req.method == "PUT":  # upravenie velkej ceny
         return patchInSchedule(race_id, season_id, json.loads(req.body)["params"])
 
     if req.method == "DELETE":  # vymazanie velkej ceny z kalendaru
@@ -174,3 +175,28 @@ def seasonFia(req: HttpRequest, season_id: str):
         return postFIA(season_id, json.loads(req.body)["params"])
 
     return HttpResponseNotFound()
+
+# api/admins/users-roles/
+@csrf_exempt
+def userRoles(req: HttpRequest):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, ["Sys Admin", "F1 Super Admin"]
+    )
+
+    if permission != True:
+        return permission
+    
+    if req.method == "GET":
+        return get_users()
+    
+    if req.method == "PATCH":
+        return add_user_role(json.loads(req.body)['params'])
+    
+
+    user_id = req.GET.get('user_id')
+    role = req.GET.get('role')
+
+    if req.method == "DELETE":
+        return delete_user_role(user_id=user_id, role=role)

@@ -67,4 +67,5 @@ urlpatterns = [
     path(
         "api/admins/fia/<str:season_id>/", adminViews.seasonFia
     ),  # zoznam vsetkych pouzivatelov dostupnych na poziciu a ulozenie fie
+    path("api/admins/users-roles/", adminViews.userRoles)
 ]

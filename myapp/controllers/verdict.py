@@ -1,7 +1,7 @@
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.db.models import Prefetch
 from django.db import connection
-from ..models import Reports, ReportTargets, UsersRoles, Roles
+from ..models import Reports, ReportTargets, UsersRoles
 from typing import TypedDict, List
 import json
 from ..discord.discordIntegration import notify_discord_on_report
