@@ -176,6 +176,14 @@ class DiscordAccounts(models.Model):
 
     premium_type = models.IntegerField()
 
+    accent_color = models.TextField(blank=True, null=True)
+
+    banner = models.TextField(blank=True, null=True)
+
+    avatar_decoration = models.TextField(blank=True, null=True)
+
+    banner_color = models.TextField(blank=True, null=True)
+
 
 
     class Meta:
@@ -365,6 +373,8 @@ class RacesDrivers(models.Model):
     race = models.ForeignKey(Races, models.DO_NOTHING)
 
     team = models.ForeignKey('Teams', models.DO_NOTHING)
+
+    is_dsq = models.BooleanField(blank=True, null=True)
 
 
 
