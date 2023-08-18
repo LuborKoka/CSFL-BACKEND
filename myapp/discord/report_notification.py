@@ -3,6 +3,8 @@ from ..models import ReportTargets
 import traceback, requests, os, json
 from datetime import datetime
 from django.http import HttpResponse, HttpResponseServerError
+from ..discord.user_discord import REDIRECT_BASE_URL
+
 
 def notify(reportID: str, isDecision: bool):
     webhook_url = os.environ.get('CSFL_FIA_WEBHOOK_URL') if isDecision else os.environ.get('CSFL_REPORT_WEBHOOK_URL')
@@ -70,7 +72,7 @@ def formatContent(reportID: str, report_data, isDecision: bool):
 Na koho: 
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze](http://192.168.100.22:3000/seasons/{report_data[4]}/race/{report_data[5]}/reports)
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports)
         """ 
     
     reporting_driver_name = f'<@{report_data[6]}>' if report_data[6] is not None else report_data[1]
@@ -84,7 +86,7 @@ Viac info [na tomto odkaze](http://192.168.100.22:3000/seasons/{report_data[4]}/
 - {reporting_driver_name}
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze](http://192.168.100.22:3000/seasons/{report_data[4]}/race/{report_data[5]}/reports)
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports)
     """
 
 

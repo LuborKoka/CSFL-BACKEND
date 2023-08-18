@@ -1,15 +1,17 @@
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotFound, HttpResponseServerError
 from typing import ItemsView
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from manage import PATH
 from django.db import connection, transaction
 from django.db.models import Prefetch
+from django.core.exceptions import ObjectDoesNotExist
 from typing import TypedDict, List
-from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races
+from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races, RacesDrivers, Users
 from urllib.parse import urlparse, parse_qs
-import imghdr, os, time, json, traceback
-from datetime import datetime, timedelta, timezone
+import imghdr, os, time, json, traceback, pytz
+from datetime import datetime, timedelta
 from ..discord.discordIntegration import notify_discord_on_report
+from uuid import UUID
 
 FILE_PATH = os.path.join(PATH, "media")
 FILE_PATH_DELIM = "++"
@@ -35,22 +37,14 @@ def reportUpload(
     # if datum neni medzi zaciatkom koncom,
     race = Races.objects.get(id=raceID)
 
-    #tie zony su napicu, treba doladit
-    endTime = (race.date + timedelta(days=1)).replace(hour=23, minute=59, second=59)
-    print(endTime)
-    local_offset = timezone(timedelta(seconds=-time.timezone))
-    print(datetime.now(local_offset))
-    # if race.date > datetime.now(local_offset):
-    #     return HttpResponseBadRequest(
-    #         json.dumps({"error": "Ešte je na posielanie reportov skoro."})
-    #     )
-# 
-    # if datetime.now(local_offset) > endTime:
-    #     return HttpResponseForbidden(
-    #         json.dumps({"error": "Čas na posielanie reportov už vypršal."})
-    #     )
-
     form = json.loads(form)
+
+    user = Users.objects.select_related('driver').get(id=form["from_driver"])
+    is_allowed = allowReportPost(race.date, False, race.id, user.driver.id)
+
+    if not is_allowed == True:
+        return is_allowed
+    
     video_paths = []
 
     report = [
@@ -109,7 +103,7 @@ def reportUpload(
         return HttpResponseBadRequest(json.dumps({
             "error": "Niečo sa pokazilo. Skús report odoslať znova."
         }))
-
+    
 
 def getReports(raceID: str):
     result = {"reports": []}
@@ -201,6 +195,22 @@ def postReportResponse(
     files: ItemsView[str, InMemoryUploadedFile], reportID: str, form: ReportResponse
 ):
     data = [form["from_driver"], form["inchident"], reportID]
+
+    try:
+        report = Reports.objects.select_related('race').get(id = reportID)
+        user = Users.objects.select_related('driver').get(id=form["from_driver"])
+
+    except ObjectDoesNotExist:
+        return HttpResponseNotFound()
+    
+    except Exception:
+        HttpResponseServerError()
+
+    is_allowed = allowReportPost(report.race.date, True, reportID, user.driver.id)
+
+    if not is_allowed == True:
+        return is_allowed
+
     c = connection.cursor()
     try:
         c.execute(
@@ -213,6 +223,8 @@ def postReportResponse(
         )
 
         id = c.fetchone()[0]
+
+        c.close()
 
     except Exception as e:
         print(e)
@@ -308,3 +320,71 @@ def getEmbedUrl(url: str):
 
     # If the video id was not found, return the original url
     return {"url": url, "embed": False}
+
+
+
+def allowReportPost(date: datetime, is_response: bool, subject_id: UUID | str, driver_id: UUID) -> bool | HttpResponseBadRequest | HttpResponseForbidden:
+    """
+    Params:
+        date: race date
+        is_response: self explanatory
+        subject_id: if is_response then report_id else race_id
+        driver_id: from driver (id)
+
+    Returns:
+        true if user is permitted or the appropriate http response.
+    """
+    
+    endTime = (date + timedelta(days=1)).replace(hour=23, minute=59, second=59, tzinfo=None)
+    now = datetime.now()
+
+    try:
+        did_participate = False
+        id = Reports.objects.select_related('race').get(id=subject_id).race.id if is_response else subject_id
+        drivers = RacesDrivers.objects.select_related('driver').filter(race_id=id)
+        for d in drivers:
+            if d.driver.id == driver_id:
+                did_participate = True
+                break
+
+    except Exception:
+        traceback.print_exc()
+        return HttpResponseServerError()
+   
+    if not did_participate:
+        return HttpResponseForbidden(json.dumps({
+            "error": "Nemáš dovolené sa tu vyjadriť. Už to neskúšaj."
+        }))
+
+    if now <= date.replace(tzinfo=None):
+        return HttpResponseBadRequest(json.dumps({
+            "error": "Ešte je na posielanie reportov skoro."
+        }))
+
+    if not is_response:
+        if now > endTime:
+            return HttpResponseForbidden(json.dumps({
+                "error": "Čas na posielanie reportov už vypršal."
+            }))
+                
+        return True      
+    
+
+    try:
+        report = Reports.objects.get(id = subject_id)
+        targets = ReportTargets.objects.filter(report_id=subject_id, driver_id=driver_id)
+    except Exception:
+        return HttpResponseServerError()
+
+
+    # ti, na ktorych je poslany
+    for t in targets:
+        if t.driver.id == driver_id and (now < (report.created_at + timedelta(days=1) ).replace(tzinfo=None) or now < endTime):
+            return True
+        
+    if now < endTime:
+        return True
+    
+    return HttpResponseForbidden(json.dumps({
+        "error": "Čas na posielanie reportov už vypršal."
+    }))

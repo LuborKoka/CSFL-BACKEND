@@ -243,6 +243,11 @@ def getEditRaceResults(raceID: str):
 # bude treba aj sprinty doriesit
 @transaction.atomic
 def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
+    """
+    Saves race results for the specific raceID.
+
+    Returns the appropriate http response.
+    """
     # prepocet casu vitaza na sekundy
     leader = {
         "id": params["results"]["leader"]["id"],
