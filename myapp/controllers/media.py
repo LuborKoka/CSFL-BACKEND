@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpResponseBadRequest, FileResponse
+from django.http import HttpResponse, FileResponse, HttpResponseNotFound
 from ..models import Tracks
 from .report import FILE_PATH
 import os
@@ -19,7 +19,7 @@ def raceImage(trackID: str):
 
     except Exception as e:
         print(e)
-        return HttpResponseBadRequest()
+        return HttpResponseNotFound()
 
 
 def media(name: str, folder: str):
@@ -28,6 +28,9 @@ def media(name: str, folder: str):
         FILE_PATH + delim + name if folder is None else FILE_PATH + delim + folder + delim + name
     )
 
-    response = FileResponse(open(video_path, "rb"))
+    try:
+        response = FileResponse(open(video_path, "rb"))
+    except FileNotFoundError:
+        return HttpResponseNotFound()
     response["Cache-Control"] = "public, max-age=31536000"
     return response
