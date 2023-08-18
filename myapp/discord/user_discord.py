@@ -1,5 +1,5 @@
 from ..models import Users, DiscordAccounts
-from django.http import HttpResponse, HttpResponseServerError, HttpResponseBadRequest, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseServerError, HttpResponseBadRequest, HttpResponseNotFound, JsonResponse
 from django.db import connection, IntegrityError
 from django.core.exceptions import ObjectDoesNotExist
 from typing import TypedDict
@@ -13,7 +13,8 @@ class UserDiscordParams(TypedDict):
 DISCORD_API_URI = 'https://discord.com/api/v10'
 CLIENT_ID = os.environ.get('DISCORD_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('DISCORD_CLIENT_SECRET')
-REDIRECT_URI = 'http://192.168.100.22:3000/verify-user'
+REDIRECT_BASE_URL = 'http://192.168.100.22:3000'
+GUILD_ID = os.environ.get('CSFL_GUILD_ID')
 
 
 
@@ -25,8 +26,7 @@ def save_user_discord(params: UserDiscordParams):
     try:
         access_token_response = exchange_code(params['code'])
         user_data = get_user_data(access_token_response['access_token'])
-        print(access_token_response)
-        print(user_data)
+
     except Exception:
         return HttpResponseServerError(json.dumps({"error": "Nepodarilo sa získať dáta z discordu."}))
 
@@ -54,7 +54,7 @@ def save_user_discord(params: UserDiscordParams):
         user.discord_account= dc_acc
         user.save()
 
-        return HttpResponse(status=204)
+        return JsonResponse({"is_member": user_data["is_member"]})
         
     except IntegrityError:
         return HttpResponseBadRequest(json.dumps({
@@ -130,7 +130,7 @@ def exchange_code(code: str):
     'client_secret': CLIENT_SECRET,
     'grant_type': 'authorization_code',
     'code': code,
-    'redirect_uri': REDIRECT_URI
+    'redirect_uri': REDIRECT_BASE_URL + '/verify-user'
     }
     headers = {
     'Content-Type': 'application/x-www-form-urlencoded'
@@ -144,8 +144,10 @@ def get_user_data(access_token: str):
     headers = {
         'Authorization': f'Bearer {access_token}'
     }
+    guilds = requests.get('%s/users/@me/guilds' % DISCORD_API_URI, headers=headers)
     response = requests.get('%s/users/@me' % DISCORD_API_URI, headers=headers)
     response.raise_for_status()
+    guilds.raise_for_status()
     data = response.json()
 
     result = {"id": data["id"], "username": data["username"]}
@@ -157,4 +159,12 @@ def get_user_data(access_token: str):
     result["accent_color"] = data["accent_color"] if "accent_color" in data else None
     result["premium_type"] = data['premium_type'] if "premium_type" in data else 0
 
+
+    for guild in guilds.json():
+        if guild['id'] == GUILD_ID:
+            result["is_member"] = True
+            return result
+
+
+    result["is_member"] = False
     return result
