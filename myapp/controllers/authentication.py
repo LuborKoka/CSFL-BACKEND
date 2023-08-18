@@ -74,11 +74,11 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             driver = {"id": str(c.fetchone()[0])}
 
         except Exception as e:
+            c.close()
             if "value too long for type character varying" in str(e):
                 return HttpResponseBadRequest(
                     json.dumps({"error": "Meno musí mať najviac 50 znakov."})
                 )
-            print(e)
             return HttpResponseServerError()
 
     hash = bcrypt.hashpw(
@@ -95,6 +95,7 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             [params["username"], hash, driver["id"]],
         )
         user = c.fetchone()
+        c.close()
 
         payload = {
             "username": params["username"],
@@ -109,6 +110,7 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
         responseData = json.dumps({"token": token})
         return HttpResponse(responseData, status=201)
     except IntegrityError as e:
+        c.close()
         if 'duplicate key value violates unique constraint "unique_driver_id"' in str(
             e
         ):
@@ -126,11 +128,11 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
             )
 
     except Exception as e:
+        c.close()
         if "value too long for type character varying" in str(e):
             return HttpResponseBadRequest(
                 json.dumps({"error": "Meno musí mať najviac 50 znakov."})
             )
-        print(e)
         return HttpResponseServerError()
 
 
