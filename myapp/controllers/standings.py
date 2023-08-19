@@ -23,7 +23,7 @@ def getStandings(seasonID: str):
                             ORDER BY driver_id, race_id
                     ),
                     results AS (
-                        SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
+                        SELECT *, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
                         FROM (
                             SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint, rd.is_dsq
                             FROM races_drivers AS rd
@@ -36,10 +36,10 @@ def getStandings(seasonID: str):
                     res_with_points AS (
                         SELECT d.id AS driver_id, d.name AS driver_name, sd.is_reserve, tr.flag, t.name AS team_name, rd.time, rd.has_fastest_lap, re.rank, r.date,
                             CASE
-                                WHEN rd.time IS NULL THEN 0
+                                WHEN rd.time IS NULL OR re.is_dsq = TRUE THEN 0
                                 ELSE
                                     CASE
-                                        WHEN r.is_sprint = TRUE OR re.is_dsq = TRUE THEN 
+                                        WHEN r.is_sprint = TRUE   THEN 
                                             CASE
                                                 WHEN re.rank = 1 THEN 8
                                                 WHEN re.rank = 2 THEN 7

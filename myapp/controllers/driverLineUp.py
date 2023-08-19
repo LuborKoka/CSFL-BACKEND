@@ -106,6 +106,7 @@ def getTeamDrivers(seasonID: str):
 
 def postTeamDrivers(seasonID: str, params: Team):
     try:
+        # ak prichadza o sedacku, nastavim ho ako nahradnika
         for r in params["drivers"]["reserves"]:
             reserve = SeasonsDrivers.objects.get(season_id=seasonID, driver_id=r)
             reserve.team = None
@@ -113,7 +114,6 @@ def postTeamDrivers(seasonID: str, params: Team):
             reserve.save()
 
     except Exception as e:
-        print(e)
         return HttpResponseBadRequest()
 
     if len(params["drivers"]["newDrivers"]) == 0:
@@ -127,6 +127,8 @@ def postTeamDrivers(seasonID: str, params: Team):
         data.append((d, seasonID, params["teamID"]))
 
     try:
+
+        # povodny zamer bol prepisat nahradnikov do noveho timu on conflict, ale prepise aj tych, ktori uz tim maju
         c.executemany(
             """
                 INSERT INTO seasons_drivers(driver_id, season_id, team_id)
