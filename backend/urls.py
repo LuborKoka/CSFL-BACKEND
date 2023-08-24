@@ -29,6 +29,7 @@ urlpatterns = [
     path("api/login/", userViews.signin),  # authentication.py
     path("api/user-discord/<str:user_id>/", userViews.userDiscord),
     path("api/change-password/", userViews.changePasswordEndpoint),  # authentication.py
+    path('api/name-change/', userViews.changeNameEndpoint),
     path("api/roles/<str:user_id>/", sharedViews.roles),
     path(
         "api/races/<str:race_id>/drivers/", userViews.fetchRaceDrivers
@@ -67,5 +68,7 @@ urlpatterns = [
     path(
         "api/admins/fia/<str:season_id>/", adminViews.seasonFia
     ),  # zoznam vsetkych pouzivatelov dostupnych na poziciu a ulozenie fie
-    path("api/admins/users-roles/", adminViews.userRoles)
+    path("api/admins/users-roles/", adminViews.userRoles),
+    path("api/wife-beater/drivers/", adminViews.drivers),
+    path("api/wife-beater/roles/", adminViews.changeRoles)
 ]

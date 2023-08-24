@@ -1,12 +1,14 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 from django.db import connection
-from typing import List, TypedDict
-import json
-
+import json, traceback
+from ..controllers.uuid import is_valid_uuid
 
 def getStandings(seasonID: str):
     # treba pridat penalizacie
     # pridane
+
+    if not is_valid_uuid(seasonID):
+        return HttpResponseNotFound()
 
     try:
         with connection.cursor() as c:
@@ -286,8 +288,8 @@ def getStandings(seasonID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 

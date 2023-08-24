@@ -1,9 +1,10 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 from django.db import connection
 from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers, Seasons
-import json, pytz
+import json, pytz, traceback
 from typing import TypedDict, List, Dict
 from datetime import datetime
+from ..controllers.uuid import is_valid_uuid
 
 
 class CreateSeasonParams(TypedDict):
@@ -49,8 +50,8 @@ def getAllAvailableTracks():
 
         return HttpResponse(json.dumps(data), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -78,8 +79,8 @@ def fetchAllTeamsDrivers(seasonID: str):
 
         return HttpResponse(json.dumps(data), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -105,8 +106,8 @@ def submitTeamsDrivers(data: SubmitTeamsDriversParams):
             )
 
         return HttpResponse(status=200)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -158,12 +159,15 @@ def postSchedule(params: PostScheduleParams, seasonID):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
 def getSchedule(seasonID):
+    if not is_valid_uuid(seasonID):
+        return HttpResponseNotFound()
+
     try:
         schedule = (
             Races.objects.filter(season_id=seasonID)
@@ -188,8 +192,8 @@ def getSchedule(seasonID):
             )
 
         return HttpResponse(json.dumps(result), status=200)
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -199,8 +203,8 @@ def deleteSchedule(seasonID: str):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -210,8 +214,8 @@ def deleteFromSchedule(raceID: str, seasonID: str):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -225,6 +229,6 @@ def patchInSchedule(raceID: str, seasonID: str, params: PatchRaceParams):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()

@@ -1,18 +1,19 @@
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound
 from django.db import connection
-from ..models import Drivers, SeasonsDrivers, Teams
+from ..models import SeasonsDrivers, Teams
 from typing import TypedDict, List
-import json
+import json, traceback
+from ..controllers.uuid import is_valid_uuid
 
 
-class Drivers(TypedDict):
+class DriversParams(TypedDict):
     reserves: List[str]
     newDrivers: List[str]
 
 
 class Team(TypedDict):
     teamID: str
-    drivers: Drivers
+    drivers: DriversParams
 
 
 # moze byt jeden driver vo viacerych timoch naraz
@@ -29,6 +30,10 @@ def getTeamDrivers(seasonID: str):
     Returns:
         An array of all teams and their drivers.
     """
+
+    if not is_valid_uuid(seasonID):
+        return HttpResponseNotFound()
+
     c = connection.cursor()
 
     result = {"teams": [], "availableDrivers": [], "reserves": []}
@@ -54,8 +59,9 @@ def getTeamDrivers(seasonID: str):
         for d in available:
             result["availableDrivers"].append({"id": str(d[0]), "name": d[1]})
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseBadRequest()
     
     isEmptyLineUp = True
@@ -85,8 +91,9 @@ def getTeamDrivers(seasonID: str):
         if isEmptyLineUp:
             result['isEmptyLineUp'] = True
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseBadRequest()
 
     try:
@@ -97,10 +104,12 @@ def getTeamDrivers(seasonID: str):
         for r in reserves:
             result["reserves"].append({"id": str(r.driver.id), "name": r.driver.name})
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseServerError()
-
+    
+    c.close()
     return HttpResponse(json.dumps(result), status=200)
 
 
@@ -141,6 +150,6 @@ def postTeamDrivers(seasonID: str, params: Team):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()

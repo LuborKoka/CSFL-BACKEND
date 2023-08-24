@@ -292,6 +292,8 @@ class Drivers(models.Model):
 
     name = models.CharField(unique=True, max_length=50, blank=True, null=True)
 
+    updated_at = models.DateTimeField(blank=True, null=True)
+
 
 
     class Meta:
@@ -383,6 +385,8 @@ class RacesDrivers(models.Model):
         managed = False
 
         db_table = 'races_drivers'
+
+        unique_together = (('race', 'driver'),)
 
 
 

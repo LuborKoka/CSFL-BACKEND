@@ -1,7 +1,7 @@
 from django.db import connection
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
-import json
-from ..models import Races, Seasons, UsersRoles
+import json, traceback
+from ..models import Seasons
 from typing import TypedDict, List
 
 
@@ -53,11 +53,12 @@ def createSeason(params):
 
         data["seasonID"] = seasonID
 
+        c.close()
         return HttpResponse(json.dumps(data), status=201)
 
-    except Exception as e:
-        print(e)
-
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseBadRequest()
 
 
@@ -68,8 +69,8 @@ def getAllSeasons():
         for s in seasons:
             result["seasons"].append({"id": str(s.id), "name": s.name})
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
 
     return HttpResponse(json.dumps(result), status=200)
 
@@ -100,10 +101,12 @@ def getNonReserveDrivers(seasonID: str):
         for d in drivers:
             result["drivers"].append({"driverID": str(d[0]), "driverName": d[1]})
 
+        c.close()
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseBadRequest()
 
 
@@ -124,10 +127,12 @@ def postNewReserves(seasonID: str, params: PostReservesParams):
             data,
         )
 
+        c.close()
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseBadRequest()
 
 
@@ -179,10 +184,12 @@ def getFiaCandidates(seasonID: str):
         for c in current:
             result["currentFIA"].append({"userID": str(c[0]), "driverName": c[1]})
 
+        c.close()
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseServerError()
 
 
@@ -199,8 +206,9 @@ def postFIA(seasonID: str, params: PostFiaParams):
             [seasonID],
         )
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        c.close()
+        traceback.print_exc()
         return HttpResponseServerError()
 
     if len(params["users"]) == 0:
@@ -218,8 +226,10 @@ def postFIA(seasonID: str, params: PostFiaParams):
             data,
         )
 
+        c.close()
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
+        c.close()
         return HttpResponseServerError()

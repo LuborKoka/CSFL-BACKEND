@@ -1,7 +1,7 @@
 from django.http import HttpResponse, FileResponse, HttpResponseNotFound
 from ..models import Tracks
 from .report import FILE_PATH
-import os
+import os, traceback
 
 print(FILE_PATH)
 
@@ -17,8 +17,8 @@ def raceImage(trackID: str):
         response["Content-Disposition"] = "inline"
         return response
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseNotFound()
 
 

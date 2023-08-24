@@ -6,10 +6,10 @@ from django.http import (
 )
 from django.db import connection, transaction
 from ..models import Races, RacesDrivers, SeasonsDrivers, Teams
-import json
+import json, traceback
 from typing import TypedDict, List
 from .timeFormatting import gap_to_time, time_to_seconds, time_to_gap
-import traceback
+from ..controllers.uuid import is_valid_uuid
 
 
 class Driver(TypedDict):
@@ -38,6 +38,10 @@ class PostRaceResultsParams(TypedDict):
 
 
 def getRaceDrivers(id: str):
+    if not is_valid_uuid(id):
+        return HttpResponseNotFound()
+    
+
     try:
         drivers = (
             RacesDrivers.objects.filter(race=id)
@@ -63,8 +67,8 @@ def getRaceDrivers(id: str):
 
         return HttpResponse(json.dumps(data), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
 
     return HttpResponseBadRequest()
 
@@ -79,9 +83,8 @@ def getEditRace(raceID: str):
             is_reserve=True, season_id=race.season.id
         ).select_related("driver")
 
-    except Exception as e:
-        print(e)
-        print("no teams found")
+    except Exception:
+        traceback.print_exc()
         return HttpResponseServerError()
 
     # tuna su uz zapisani jazdci na velku cenu
@@ -133,7 +136,7 @@ def getEditRace(raceID: str):
 
             return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
 
     # ak neni su ziadni zapisani, fetchnem timove dvojice pre sezonu
@@ -171,8 +174,8 @@ def getEditRace(raceID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -186,8 +189,8 @@ def postEditRaceDrivers(raceID: str, params: RaceDriversParams):
         raceDrivers = RacesDrivers.objects.filter(race_id=raceID)
         raceDrivers.delete()
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseServerError()
 
     data = []
@@ -208,8 +211,8 @@ def postEditRaceDrivers(raceID: str, params: RaceDriversParams):
 
         return HttpResponse(status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -235,8 +238,8 @@ def getEditRaceResults(raceID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -277,8 +280,8 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
         )
 
         c.fetchone()[0]
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseNotFound()
 
     data = []
@@ -304,13 +307,16 @@ def postEditRaceResults(raceID: str, params: PostRaceResultsParams):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
 def getRaceResults(raceID: str):
     # doriesit preteky, ktore maju supisku ale nemaju este zapisane vysledky, kazdemu jebne vitazsvo
+
+    if not is_valid_uuid(raceID):
+        return HttpResponseNotFound()
 
     c = connection.cursor()
     try:
@@ -364,8 +370,8 @@ def getRaceResults(raceID: str):
 
         return HttpResponse(json.dumps(results), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 

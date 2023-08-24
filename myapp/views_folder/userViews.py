@@ -11,12 +11,11 @@ from ..controllers.verdict import (
     postVerdict,
 )
 from ..controllers.report import postReportResponse, getReports, reportUpload
-from ..controllers.authentication import userSignUp, userLogIn, changePassword
+from ..controllers.authentication import userSignUp, userLogIn, changePassword, changeDriverName
 from ..discord.discordIntegration import saveUserDiscord, getUserDiscord, deleteUserDiscord
+from ..controllers.credentials import isUserPermitted
 from ..controllers.authentication import csrf_token
-import os, binascii, base64
-
-SECRET_KEY = base64.b64encode(binascii.b2a_hex(os.urandom(31))).decode("UTF-8")
+from ..controllers.secrets import SECRET_KEY
 
 def getCSRFToken(req: HttpRequest):
     if req.method == "GET":
@@ -29,6 +28,15 @@ def signup(req: HttpRequest):
         data = json.loads(req.body)
         return userSignUp(data["params"], SECRET_KEY)
     
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, []
+    )
+
+    if permission != True:
+        return permission
+    
     if req.method == "PUT":
         return saveUserDiscord(json.loads(req.body)["params"])
 
@@ -40,6 +48,15 @@ def signup(req: HttpRequest):
 def userDiscord(req: HttpRequest, user_id: str):
     if req.method == "GET":
         return getUserDiscord(user_id)
+    
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, []
+    )
+
+    if permission != True:
+        return permission
 
     if req.method == "POST":
         return saveUserDiscord(json.loads(req.body)["params"])
@@ -50,7 +67,6 @@ def userDiscord(req: HttpRequest, user_id: str):
 
 @csrf_exempt  # api/login/
 def signin(req: HttpRequest):
-    print("signin request recieved")
     if req.method == "POST":
         # for attr_name in dir(req):
         #     attr_value = getattr(req, attr_name)
@@ -67,6 +83,13 @@ def changePasswordEndpoint(req: HttpRequest):
         data = json.loads(req.body)
         return changePassword(data["params"])
     return HttpResponseNotFound()
+
+
+# api/change-name/
+@csrf_exempt
+def changeNameEndpoint(req: HttpRequest):
+    if req.method == "PATCH":
+        return changeDriverName(json.loads(req.body)["params"], SECRET_KEY)
 
 
 # api/seasons/<str:season_id>/standings/
@@ -135,6 +158,7 @@ def reportVerdict(req: HttpRequest, report_id: str):
     if req.method == "GET":
         return getConcernedDrivers(report_id)
 
+
     if req.method == "POST":
         data = json.loads(req.body)["params"]
         return postVerdict(report_id, data)
@@ -146,6 +170,16 @@ def reportVerdict(req: HttpRequest, report_id: str):
 # api/report/<str:report_id>/response/
 @csrf_exempt
 def reportResponse(req: HttpRequest, report_id: str):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, []
+    )
+
+    if permission != True:
+        return permission
+
+
     if req.method == "POST":
         return postReportResponse(
             req.FILES.items(), report_id, json.loads(dict(req.POST.items())["data"])
@@ -158,6 +192,15 @@ def reportResponse(req: HttpRequest, report_id: str):
 def report(req: HttpRequest, race_id: str):
     if req.method == "GET":
         return getReports(race_id)
+    
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, []
+    )
+
+    if permission != True:
+        return permission
 
     if req.method == "POST":
         return reportUpload(

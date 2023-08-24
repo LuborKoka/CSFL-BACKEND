@@ -83,7 +83,7 @@ DATABASES = {
         "NAME": "CSFL",
         "USER": "postgres",
         "PASSWORD": os.getenv("DATABASE_PASSWORD"),
-        "HOST": "localhost",
+        "HOST": "localhost", 
         "PORT": "5432",
     }
 }
@@ -112,7 +112,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://192.168.100.22:3000",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "https://csfl.cz"
 ]
 
 # Add or modify this setting

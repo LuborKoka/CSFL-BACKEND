@@ -33,8 +33,6 @@ def gap_to_time(time: float, gap: str) -> float:
     # Add the gap to the initial time and return the result
     return time + gap_in_seconds
 
-import re
-
 def time_to_gap(leader_time: float | None, driver_time: float | None) -> str | None:
     """
     Converts the time difference between a leader time and a driver time into a gap string.

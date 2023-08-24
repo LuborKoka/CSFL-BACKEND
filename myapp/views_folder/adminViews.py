@@ -24,6 +24,7 @@ from ..controllers.scheduleRelated import (
 )
 from ..controllers.credentials import isUserPermitted
 from ..controllers.users_roles import get_users, add_user_role, delete_user_role
+from ..controllers.wife_beater import createDriver
 
 # content:
 #   seasons or drivers
@@ -200,3 +201,49 @@ def userRoles(req: HttpRequest):
 
     if req.method == "DELETE":
         return delete_user_role(user_id=user_id, role=role)
+    
+
+# api/wife-beater/drivers/
+@csrf_exempt
+def drivers(req: HttpRequest):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, ["Sys Admin"]
+    )
+
+    if permission != True:
+        return permission
+    
+
+    if req.method == "POST":
+        return createDriver(json.loads(req.body)['params'])
+    
+
+# api/wife-beater/roles/
+@csrf_exempt
+def changeRoles(req: HttpRequest):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, ["Sys Admin"]
+    )
+
+    if permission != True:
+        return permission
+    
+
+    if req.method == "GET":
+        return get_users()
+    
+    userID = req.GET.get('user_id')
+    roleID = req.GET.get('role_id')
+
+    if req.method == "PUT":
+        return add_user_role(userID, roleID)
+    
+
+    if req.method == "DELETE":
+        return delete_user_role(userID, roleID)
+    
+    return HttpResponseNotFound()

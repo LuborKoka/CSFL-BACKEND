@@ -1,14 +1,11 @@
 from typing import TypedDict
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, HttpResponseServerError, HttpRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, HttpResponseServerError, HttpRequest, JsonResponse, HttpResponseForbidden
 from django.db import connection, IntegrityError, transaction
 from django.middleware.csrf import get_token
 from django.core.exceptions import ObjectDoesNotExist
-import bcrypt
-import jwt
-import json
-from ..models import Users, Drivers, UsersRoles, Roles
+import bcrypt, jwt, json, time, traceback
+from ..models import Users, Drivers, UsersRoles
 from uuid import UUID
-import time
 from datetime import datetime, timedelta
 
 # chyba porobit role a ukladanie tokenov do prihlaseni
@@ -43,6 +40,10 @@ class changePasswordParams(TypedDict):
     newPassword: str
     newPasswordConfirm: str
 
+class ChangeNameParams(TypedDict):
+    password: str
+    name: str
+    user_id: str
 
 # doplnit pri registracii race name, ak uz existuje, prepojit, ak nie, vytvorit noveho drajvera
 # doplnene
@@ -100,7 +101,7 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
         payload = {
             "username": params["username"],
             "id": str(user[0]),
-            "exp": datetime.utcnow() + timedelta(days=7),
+            "exp": datetime.utcnow() + timedelta(days=31),
             "driverID": str(driver["id"]),
             "driverName": params["raceName"]
         }
@@ -110,8 +111,9 @@ def userSignUp(params: signUpParams, SECRET_KEY: str):
         responseData = json.dumps({"token": token})
         return HttpResponse(responseData, status=201)
     except IntegrityError as e:
+        print(str(e))
         c.close()
-        if 'duplicate key value violates unique constraint "unique_driver_id"' in str(
+        if 'duplicate key value violates unique constraint "users_driver_id_key"' in str(
             e
         ):
             return HttpResponse(
@@ -147,7 +149,7 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
         return HttpResponse(data, status=401)
 
     except Exception as e:
-        print(e)
+        traceback.print_exc()   
         time.sleep(1.5)
         return HttpResponseServerError()
 
@@ -158,7 +160,7 @@ def userLogIn(params: logInParmas, SECRET_KEY: str):
         payload = {
             "username": params["username"],
             "id": str(user.id),
-            "exp": datetime.utcnow() + timedelta(days=7),
+            "exp": datetime.utcnow() + timedelta(days=31),
             "driverID": str(user.driver.id),
             "driverName": user.driver.name
         }
@@ -231,9 +233,58 @@ def changePassword(params: changePasswordParams):
         return HttpResponseBadRequest()
 
 
+def changeDriverName(params: ChangeNameParams, SECRET_KEY: str):
+    try:    
+        user = Users.objects.select_related('driver').get(id=params["user_id"])
+
+        # dorobit timeout 1 mesiac
+
+        if bcrypt.checkpw(
+            password=params["password"].encode("UTF-8"),
+            hashed_password=bytes(user.password),
+        ):
+            next_change_date = (user.driver.updated_at + timedelta(days=31)).replace(tzinfo=None)
+            if datetime.now() < next_change_date:
+                return HttpResponseForbidden(json.dumps({
+                    "error": "Zmena mena je možná len raz za 31 dní."
+                }))
+
+
+            user.driver.name = params["name"]
+            user.driver.updated_at = datetime.now()
+            user.driver.save()
+
+            payload = {
+                "username": user.username,
+                "id": str(user.id),
+                "exp": datetime.now() + timedelta(days=31),
+                "driverID": str(user.driver.id),
+                "driverName": params["name"]
+            }
+            token = jwt.encode(payload=payload, key=SECRET_KEY)
+
+            return HttpResponse(json.dumps({
+                "token": token
+            }))
+
+
+
+        return HttpResponseBadRequest(json.dumps({
+            "error": "Nesprávne heslo."
+        }))
+
+
+    except Exception:
+        return HttpResponseServerError()
+
+
+
+
 def csrf_token(req: HttpRequest):
     token = get_token(req)
     response = JsonResponse({'csrf_token': token})
     # response["Access-Control-Allow-Origin"] = "https://your-react-app-domain.com"
     response["Access-Control-Allow-Credentials"] = "true"
     return response
+
+

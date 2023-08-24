@@ -3,7 +3,7 @@ from django.db.models import Prefetch
 from django.db import connection, transaction
 from ..models import Reports, ReportTargets, UsersRoles, RacesDrivers
 from typing import TypedDict, List
-import json
+import json, traceback
 from ..discord.discordIntegration import notify_discord_on_report
 
 
@@ -39,8 +39,8 @@ def getConcernedDrivers(reportID):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 @transaction.atomic
@@ -49,6 +49,11 @@ def postVerdict(reportID: str, params: NewVerdict):
         report = Reports.objects.select_related('race').get(id=reportID)
 
         user_role = UsersRoles.objects.select_related('role').filter(role__name=f'{report.race.season.name}fia')
+
+        if report.verdict is not None:
+            return HttpResponse(json.dumps({
+                "error": "Tento report už rozhodnutie zapísané má."
+            }), status=409)
 
         if len(user_role) == 0:
             return HttpResponseForbidden(json.dumps({
@@ -64,7 +69,7 @@ def postVerdict(reportID: str, params: NewVerdict):
         data = []
 
         for p in params["penalties"]:
-            data.append((p["penaltyPoints"], p["time"], p["driverID"], reportID))
+            data.append((p["penaltyPoints"], p["time"], p["driverID"], reportID, p["isDSQ"]))
             if p["isDSQ"]:
                 dr = RacesDrivers.objects.get(driver_id=p["driverID"], race_id=str(report.race.id))
                 dr.is_dsq = True
@@ -73,16 +78,16 @@ def postVerdict(reportID: str, params: NewVerdict):
         with connection.cursor() as c:
             c.executemany(
                 """
-                    INSERT INTO penalties(penalty_points, time, driver_id, report_id)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO penalties(penalty_points, time, driver_id, report_id, is_dsq)
+                    VALUES (%s, %s, %s, %s, %s)
                 """,
                 data,
             )
 
         return notify_discord_on_report(reportID, True)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -134,6 +139,6 @@ def getRaceReportsFIAVersion(raceID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()

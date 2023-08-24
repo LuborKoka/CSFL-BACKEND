@@ -13,7 +13,7 @@ class UserDiscordParams(TypedDict):
 DISCORD_API_URI = 'https://discord.com/api/v10'
 CLIENT_ID = os.environ.get('DISCORD_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('DISCORD_CLIENT_SECRET')
-REDIRECT_BASE_URL = 'http://192.168.100.22:3000'
+REDIRECT_BASE_URL = 'http://192.168.100.22:3000' #'http://csfl.cz'
 GUILD_ID = os.environ.get('CSFL_GUILD_ID')
 
 
@@ -54,14 +54,17 @@ def save_user_discord(params: UserDiscordParams):
         user.discord_account= dc_acc
         user.save()
 
+        c.close()
         return JsonResponse({"is_member": user_data["is_member"]})
         
     except IntegrityError:
+        c.close()
         return HttpResponseBadRequest(json.dumps({
             "error": "Tento Discord účet už niekto používa."
         }))
 
     except Exception:
+        c.close()
         traceback.print_exc()
         return HttpResponseServerError(json.dumps({
             "error": "Nepodarilo sa prepojiť tvoj discord účet."
@@ -81,6 +84,7 @@ def get_user_discord(userID: str):
         }))
 
     except Exception:
+        traceback.print_exc()
         return HttpResponseServerError(json.dumps({
             "error": "Niečo sa pokazilo, skús to znova."
         }))
@@ -111,6 +115,7 @@ def delete_user_discord(userID: str):
         }))
     
     except Exception:
+        traceback.print_exc()
         return HttpResponseServerError(json.dumps({
             "error": "Niečo sa pokazilo, skús to znova."
         }))
@@ -159,7 +164,6 @@ def get_user_data(access_token: str):
     result["accent_color"] = data["accent_color"] if "accent_color" in data else None
     result["premium_type"] = data['premium_type'] if "premium_type" in data else 0
 
-
     for guild in guilds.json():
         if guild['id'] == GUILD_ID:
             result["is_member"] = True
@@ -167,4 +171,5 @@ def get_user_data(access_token: str):
 
 
     result["is_member"] = False
+    
     return result

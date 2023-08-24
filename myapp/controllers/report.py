@@ -8,10 +8,11 @@ from django.core.exceptions import ObjectDoesNotExist
 from typing import TypedDict, List
 from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races, RacesDrivers, Users
 from urllib.parse import urlparse, parse_qs
-import imghdr, os, time, json, traceback, pytz
+import imghdr, os, json, traceback
 from datetime import datetime, timedelta
 from ..discord.discordIntegration import notify_discord_on_report
 from uuid import UUID
+
 
 FILE_PATH = os.path.join(PATH, "media")
 FILE_PATH_DELIM = "++"
@@ -98,8 +99,8 @@ def reportUpload(
 
         return notify_discord_on_report(report_id, False)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest(json.dumps({
             "error": "Niečo sa pokazilo. Skús report odoslať znova."
         }))
@@ -186,7 +187,7 @@ def getReports(raceID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return HttpResponseBadRequest()
 
@@ -204,6 +205,7 @@ def postReportResponse(
         return HttpResponseNotFound()
     
     except Exception:
+        traceback.print_exc()
         HttpResponseServerError()
 
     is_allowed = allowReportPost(report.race.date, True, reportID, user.driver.id)
@@ -226,8 +228,9 @@ def postReportResponse(
 
         c.close()
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        c.close()
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
     video_path = []
@@ -248,8 +251,8 @@ def postReportResponse(
 
         return HttpResponse(status=200)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
@@ -280,8 +283,6 @@ def processMediaPath(video_string: str):
 
     return videos
 
-
-from urllib.parse import urlparse, parse_qs
 
 
 def getEmbedUrl(url: str):
@@ -327,7 +328,7 @@ def allowReportPost(date: datetime, is_response: bool, subject_id: UUID | str, d
     """
     Params:
         date: race date
-        is_response: self explanatory
+        is_response: is it a new report or a response to a report
         subject_id: if is_response then report_id else race_id
         driver_id: from driver (id)
 
@@ -374,6 +375,7 @@ def allowReportPost(date: datetime, is_response: bool, subject_id: UUID | str, d
         report = Reports.objects.get(id = subject_id)
         targets = ReportTargets.objects.filter(report_id=subject_id, driver_id=driver_id)
     except Exception:
+        traceback.print_exc()
         return HttpResponseServerError()
 
 

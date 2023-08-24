@@ -61,4 +61,5 @@ def patchRules(params: patch_params):
         return HttpResponse(status=204)
 
     except Exception:
+        traceback.print_exc()
         return HttpResponseServerError()

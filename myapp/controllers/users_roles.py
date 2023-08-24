@@ -15,11 +15,13 @@ def get_users():
     try:
         users = Users.objects.select_related('driver').all()
         user_roles = UsersRoles.objects.select_related('role', 'user').all()
+        roles = Roles.objects.all()
 
     except Exception:
+        traceback.print_exc()
         HttpResponseServerError()
 
-    result = {"users": []}
+    result = {"users": [], "roles": []}
 
     for u in users:
         user = {
@@ -38,42 +40,35 @@ def get_users():
                 })
         result["users"].append(user)
 
+    for r in roles:
+        result['roles'].append({
+            "role_id": str(r.id),
+            "role_name": r.name
+        })
+
     return HttpResponse(json.dumps(result), status=200)
 
 
-def add_user_role(params: RoleParams):
+def add_user_role(userID: str, roleID: str):
     try:
-        role = Roles.objects.get(name = params["role"])
+        with connection.cursor() as c:
+            c.execute("""
+                INSERT INTO users_roles (user_id, role_id)
+                VALUES (%s, %s)
+            """, [userID, roleID])
 
-
-    except ObjectDoesNotExist:
-        return HttpResponseBadRequest(json.dumps({
-            "error": "Táto rola neexistuje."
-        }))
-    
     except Exception:
         traceback.print_exc()
         return HttpResponseServerError()
-    
 
+    return HttpResponse(status=204)
+
+
+
+
+def delete_user_role(user_id: str, role_id: str):   
     try:
-        c = connection.cursor()
-        c.execute("""
-            INSERT INTO users_roles(user_id, role_id) 
-            VALUES
-                (%s, %s)
-        """, [params["user_id"], str(role.id)])
-
-        return HttpResponse(status=204)
-
-    except Exception:
-        return HttpResponseServerError()
-
-
-
-def delete_user_role(user_id: str, role: str):   
-    try:
-        role = UsersRoles.objects.get(user_id = user_id, role__name = role)
+        role = UsersRoles.objects.get(user_id = user_id, role_id = role_id)
 
         role.delete()
 
@@ -85,4 +80,5 @@ def delete_user_role(user_id: str, role: str):
         }))
     
     except Exception:
+        traceback.print_exc()
         return HttpResponseServerError()
