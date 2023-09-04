@@ -193,7 +193,8 @@ def userRoles(req: HttpRequest):
         return get_users()
     
     if req.method == "PATCH":
-        return add_user_role(json.loads(req.body)['params'])
+        params = json.loads(req.body)['params']
+        return add_user_role(params['user_id'], params['role'])
     
 
     user_id = req.GET.get('user_id')

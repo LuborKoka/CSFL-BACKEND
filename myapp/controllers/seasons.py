@@ -1,4 +1,4 @@
-from django.db import connection
+from django.db import connection, transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 import json, traceback
 from ..models import Seasons
@@ -110,6 +110,7 @@ def getNonReserveDrivers(seasonID: str):
         return HttpResponseBadRequest()
 
 
+@transaction.atomic
 def postNewReserves(seasonID: str, params: PostReservesParams):
     c = connection.cursor()
 
@@ -130,9 +131,14 @@ def postNewReserves(seasonID: str, params: PostReservesParams):
         c.close()
         return HttpResponse(status=204)
 
-    except Exception:
+    except Exception as e:
         traceback.print_exc()
         c.close()
+        if 'duplicate key value violates unique constraint "unique_season_driver"' in str(e):
+            return HttpResponseBadRequest(json.dump({
+                "error": "Jeden z týchto jazdcov už na túto sezónu zapísaný je."
+            }))
+        
         return HttpResponseBadRequest()
 
 
@@ -181,8 +187,8 @@ def getFiaCandidates(seasonID: str):
 
         current = c.fetchall()
 
-        for c in current:
-            result["currentFIA"].append({"userID": str(c[0]), "driverName": c[1]})
+        for curr in current:
+            result["currentFIA"].append({"userID": str(curr[0]), "driverName": curr[1]})
 
         c.close()
         return HttpResponse(json.dumps(result), status=200)

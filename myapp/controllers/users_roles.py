@@ -21,6 +21,9 @@ def get_users():
         traceback.print_exc()
         HttpResponseServerError()
 
+
+    #admin_role = [role for role in roles if role.name == 'F1 Admin']
+
     result = {"users": [], "roles": []}
 
     for u in users:

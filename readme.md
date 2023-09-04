@@ -11,7 +11,7 @@ WITH total_pents AS (
 		ORDER BY driver_id, race_id
 ),
 results AS (
-	SELECT *, RANK() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
+	SELECT *, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY is_dsq ASC, time ASC) AS rank
 	FROM (
 		SELECT rd.driver_id, rd.race_id, rd.time + COALESCE(tp.sum, 0) AS time, r.is_sprint, rd.is_dsq
 		FROM races_drivers AS rd
@@ -65,16 +65,28 @@ res_with_points AS (
 	JOIN drivers AS d ON d.id = sd.driver_id
 	LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
 	LEFT JOIN teams AS t ON rd.team_id = t.id
-	LEFT JOIN results AS re ON rd.driver_id = re.driver_id AND rd.race_id = re.race_id
+	LEFT JOIN results AS re ON sd.driver_id = re.driver_id AND rd.race_id = re.race_id
 	WHERE sd.season_id = %s
+),
+team_colors AS (
+	SELECT driver_id, color
+	FROM seasons_drivers AS sd
+	LEFT JOIN teams AS t ON sd.team_id = t.id
+	WHERE sd.season_id = %s
+),
+avg_finish_position AS (
+	SELECT DISTINCT ON (rwp.driver_id) AVG(rank) OVER (PARTITION BY rwp.driver_id), rwp.driver_id, sd.is_reserve
+	FROM res_with_points AS rwp
+	JOIN seasons_drivers AS sd ON sd.driver_id = rwp.driver_id
+	ORDER BY driver_id
 )
-
-
-SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY driver_id) AS race_count,
-	NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint
+SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY rwp.driver_id) AS race_count,
+	NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint, tc.color
 FROM res_with_points AS rwp
 JOIN races AS r ON rwp.race_id = r.id
-ORDER BY points_total DESC, driver_name, rwp.date, r.is_sprint DESC
+JOIN team_colors AS tc ON rwp.driver_id = tc.driver_id
+JOIN avg_finish_position AS avgfp ON avgfp.driver_id = rwp.driver_id
+ORDER BY points_total DESC, avgfp.avg ASC, avgfp.is_reserve, driver_name, rwp.date, r.is_sprint DESC
 ```
 
 Bude sem treba doplnit sprinty a penalizacie of FIA. Niekde do CTE results snad.  

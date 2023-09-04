@@ -1,5 +1,5 @@
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
-from django.db import connection
+from django.db import connection, transaction
 from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers, Seasons
 import json, pytz, traceback
 from typing import TypedDict, List, Dict
@@ -111,6 +111,7 @@ def submitTeamsDrivers(data: SubmitTeamsDriversParams):
         return HttpResponseBadRequest()
 
 
+@transaction.atomic
 def postSchedule(params: PostScheduleParams, seasonID):
     races = []
     sprints = []
@@ -159,8 +160,14 @@ def postSchedule(params: PostScheduleParams, seasonID):
 
         return HttpResponse(status=204)
 
-    except Exception:
+    except Exception as e:
         traceback.print_exc()
+
+        if 'duplicate key value violates unique constraint "unique_season_race_time"' in str(e):
+            return HttpResponseBadRequest(json.dumps({
+                "error": "Pokúšaš sa zapísať dvoje preteky na jeden dátum."
+            }))
+
         return HttpResponseBadRequest()
 
 

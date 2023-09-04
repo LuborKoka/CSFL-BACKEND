@@ -133,6 +133,7 @@ def getEditRace(raceID: str):
                         team["drivers"].append(d)
 
                 result["teams"].append(team)
+                result["is_empty"] = False
 
             return HttpResponse(json.dumps(result), status=200)
 
@@ -171,6 +172,7 @@ def getEditRace(raceID: str):
             team["allOptions"].extend(reserve)
 
             result["teams"].append(team)
+            result["is_empty"] = True
 
         return HttpResponse(json.dumps(result), status=200)
 
@@ -331,7 +333,8 @@ def getRaceResults(raceID: str):
 					ORDER BY driver_id
                 ),
                 result_times AS (
-                    SELECT r.id AS race_id, d.id, d.name, rd.time + COALESCE(tp.time, 0) AS result_time, has_fastest_lap, t.name AS team_name, r.is_sprint, plus_laps, rd.is_dsq
+                    SELECT r.id AS race_id, d.id, d.name, rd.time + COALESCE(tp.time, 0) AS result_time, has_fastest_lap, t.name AS team_name, r.is_sprint, plus_laps, rd.is_dsq,
+                        NOW() > (r.date + INTERVAL '3 hours') AS has_been_raced
                     FROM races AS r
                     JOIN races_drivers AS rd ON r.id = rd.race_id
                     LEFT JOIN time_penalties AS tp ON tp.driver_id = rd.driver_id
@@ -341,17 +344,17 @@ def getRaceResults(raceID: str):
                     ORDER BY result_time
                 )
 
-                SELECT id, name, result_time, ROW_NUMBER() OVER (PARTITION BY rt.race_id ORDER BY is_dsq ASC, result_time ASC), has_fastest_lap, team_name, is_sprint, plus_laps, is_dsq
+                SELECT id, name, result_time, ROW_NUMBER() OVER (PARTITION BY rt.race_id ORDER BY is_dsq ASC, result_time ASC), has_fastest_lap, team_name, is_sprint, plus_laps, is_dsq, has_been_raced
                 FROM result_times AS rt
                 ORDER BY is_dsq ASC, result_time ASC
             """,
             [raceID, raceID],
         )
 
-        # [0: driver_id, 1: driver_name, 2: result_time, 3: rank, 4: has_fastest_lap, 5: team_name, 6: is_sprint, 7: plus_laps, 8: is_dsq]
+        # [0: driver_id, 1: driver_name, 2: result_time, 3: rank, 4: has_fastest_lap, 5: team_name, 6: is_sprint, 7: plus_laps, 8: is_dsq, 9: has_been_raced]
         drivers = c.fetchall()
 
-        results = {"results": []}
+        results = {"results": [], "has_been_raced": drivers[0][9] if len(drivers) > 0 else False}
 
         for d in drivers:
             results["results"].append(

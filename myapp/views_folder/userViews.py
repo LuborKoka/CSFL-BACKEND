@@ -195,12 +195,12 @@ def report(req: HttpRequest, race_id: str):
     
     authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
 
-    permission = isUserPermitted(
-        authorization_header, []
-    )
+    # permission = isUserPermitted(
+    #     authorization_header, []
+    # )
 
-    if permission != True:
-        return permission
+    # if permission != True:
+    #     return permission
 
     if req.method == "POST":
         return reportUpload(

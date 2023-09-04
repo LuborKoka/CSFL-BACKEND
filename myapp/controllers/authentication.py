@@ -203,7 +203,7 @@ def getUserRoles(userID: str):
 
 def changePassword(params: changePasswordParams):
     try:
-        user = Users.objects.filter(username=params["username"]).first()
+        user = Users.objects.get(username=params["username"])
 
         if not user:
             return HttpResponseNotFound()
@@ -213,7 +213,7 @@ def changePassword(params: changePasswordParams):
 
         correctPassword = bcrypt.checkpw(
             password=params["oldPassword"].encode("UTF-8"),
-            hashed_password=bytes(user["password"]),
+            hashed_password=bytes(user.password),
         )
 
         if not correctPassword:
@@ -228,8 +228,8 @@ def changePassword(params: changePasswordParams):
 
         return HttpResponse(status=204)
 
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
