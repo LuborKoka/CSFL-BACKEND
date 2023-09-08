@@ -197,7 +197,8 @@ def getUserRoles(userID: str):
 
         return HttpResponse(json.dumps(result), status=200)
 
-    except Exception as e:
+    except Exception:
+        traceback.print_exc()
         return HttpResponseBadRequest()
 
 
