@@ -14,6 +14,16 @@ from ..controllers.rules import getRules, postRules, patchRules
 # api/roles/<str:user_id>/
 @csrf_exempt
 def roles(req: HttpRequest, user_id: str):
+    authorization_header = req.META.get("HTTP_AUTHORIZATION", "")
+
+    permission = isUserPermitted(
+        authorization_header, []
+    )
+
+    if permission != True:
+        return permission
+
+
     if req.method == "GET":
         return getUserRoles(user_id)
 
