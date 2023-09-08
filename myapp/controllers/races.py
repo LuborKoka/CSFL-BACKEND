@@ -58,6 +58,7 @@ def getRaceDrivers(id: str):
                     "name": d.driver.name,
                     "teamName": d.team.name,
                     "logo": d.team.logo,
+                    "color": d.team.color
                 }
             )
 
