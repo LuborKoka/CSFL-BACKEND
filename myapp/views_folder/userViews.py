@@ -129,7 +129,8 @@ def reportVideoView(req: HttpRequest, file_name: str):
 
 def mediaView(req: HttpRequest, folder: str, file_name: str):
     if req.method == "GET":
-        return media(name=file_name, folder=folder)
+        is_download = req.GET.get('download') == 'true'
+        return media(name=file_name, folder=folder, is_download=is_download)
 
     return HttpResponseNotFound()
 

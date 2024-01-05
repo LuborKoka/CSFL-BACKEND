@@ -3,7 +3,6 @@ from ..models import Tracks
 from .report import FILE_PATH
 import os, traceback
 
-print(FILE_PATH)
 
 
 # potrebny rework na path namiesto track a team id, usetrim endpoint
@@ -22,15 +21,20 @@ def raceImage(trackID: str):
         return HttpResponseNotFound()
 
 
-def media(name: str, folder: str):
+def media(name: str, folder: str, is_download = False):
     delim = os.sep
     video_path = (
         FILE_PATH + delim + name if folder is None else FILE_PATH + delim + folder + delim + name
     )
+
 
     try:
         response = FileResponse(open(video_path, "rb"))
     except FileNotFoundError:
         return HttpResponseNotFound()
     response["Cache-Control"] = "public, max-age=31536000"
+    if is_download:
+        suffix = video_path.split('.')
+        response["Content-Disposition"] = f'attachment;filename="image.{suffix[:-1]}"'
     return response
+
