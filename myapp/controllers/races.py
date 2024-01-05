@@ -46,7 +46,7 @@ def getRaceDrivers(id: str):
         drivers = (
             RacesDrivers.objects.filter(race=id)
             .select_related("driver", "team")
-            .order_by("team_id")
+            .order_by("team__name")
         )
 
         data = {"drivers": [], "raceName": ""}

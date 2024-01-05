@@ -72,7 +72,7 @@ def formatContent(reportID: str, report_data, isDecision: bool):
 Na koho: 
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports#{report_data[3]})
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports?report={report_data[3]})
         """ 
     
     reporting_driver_name = f'<@{report_data[6]}>' if report_data[6] is not None else report_data[1]
@@ -86,7 +86,7 @@ Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{r
 - {reporting_driver_name}
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports#{report_data[3]})
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports?report={report_data[3]})
     """
 
 

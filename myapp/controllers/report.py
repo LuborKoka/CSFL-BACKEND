@@ -8,7 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from typing import TypedDict, List
 from ..models import Reports, ReportTargets, ReportResponses, Penalties, Races, RacesDrivers, Users
 from urllib.parse import urlparse, parse_qs
-import imghdr, os, json, traceback
+import imghdr, os, json, traceback, re
 from datetime import datetime, timedelta
 from ..discord.discordIntegration import notify_discord_on_report
 from uuid import UUID
@@ -87,8 +87,10 @@ def reportUpload(
         video_paths.append(v)
 
     for name, file in files:
-        video_paths.append(FILE_PATH + "reports/" + str(id) + name)
-        with open(FILE_PATH + "/reports/" + str(id) + name, "wb") as dst:
+        path = os.path.join(FILE_PATH, 'reports', f"{str(id)}{name}")
+        video_paths.append(path)
+        # video_paths.append(FILE_PATH + "reports/" + str(id) + name)
+        with open(path, "wb") as dst:
             for chunk in file.chunks():
                 dst.write(chunk)
 
@@ -115,7 +117,7 @@ def getReports(raceID: str):
             .prefetch_related(
                 Prefetch(
                     "reportresponses_set",
-                    queryset=ReportResponses.objects.select_related("from_driver"),
+                    queryset=ReportResponses.objects.select_related("from_driver").order_by("created_at"),
                 )
             )
             .order_by("created_at")
@@ -137,6 +139,7 @@ def getReports(raceID: str):
                         "driverName": p.driver.name,
                         "time": p.time,
                         "penaltyPoints": p.penalty_points,
+                        "isDSQ": p.is_dsq
                     }
                 )
 
@@ -210,7 +213,7 @@ def postReportResponse(
 
     is_allowed = allowReportPost(report.race.date, True, reportID, user.driver.id)
 
-    if not is_allowed == True:
+    if not is_allowed:
         return is_allowed
 
     c = connection.cursor()
@@ -239,8 +242,10 @@ def postReportResponse(
         video_path.append(v)
 
     for name, file in files:
-        video_path.append(FILE_PATH + str(id) + name)
-        with open(FILE_PATH + str(id) + name, "wb") as dst:
+        #video_path.append(FILE_PATH + os.sep + str(id) + name)
+        path = os.path.join(FILE_PATH, 'reports', f'{str(id)}{name}')
+        video_path.append(path)
+        with open(path, "wb") as dst:
             for chunk in file.chunks():
                 dst.write(chunk)
 
@@ -289,23 +294,36 @@ def getEmbedUrl(url: str):
     parsed_url = urlparse(url)
 
     if "youtube.com" in parsed_url.netloc:
-        # Extract the video id from the 'v' query parameter.
         query = parse_qs(parsed_url.query)
-        video_id = query.get("v")
+        path = parsed_url.path.lstrip('/')
+
+        video_id = None
+
+        if "/live/" in parsed_url.path:
+            video_id = parsed_url.path.split("live/")[-1]
+
+        if not video_id:
+            video_id_params = query.get("v")
+            if video_id_params:
+                video_id = video_id_params[0]
 
         if video_id:
-            # Return the embed link
+            embed_url = f"https://www.youtube.com/embed/{video_id}"
+
+            time_param = query.get("t") or query.get("start")
+            if time_param:
+                embed_url += f"?start={time_param[0]}"
+
             return {
-                "url": f"https://www.youtube.com/embed/{video_id[0]}",
+                "url": embed_url,
                 "embed": True,
             }
 
     elif "youtu.be" in parsed_url.netloc:
-        # Extract the video id from the URL path.
         video_id = parsed_url.path.lstrip("/")
         if video_id:
-            # Return the embed link
             return {"url": f"https://www.youtube.com/embed/{video_id}", "embed": True}
+        
 
     elif "streamable.com" in parsed_url.netloc:
         video_id = parsed_url.path.lstrip("/")
@@ -318,10 +336,17 @@ def getEmbedUrl(url: str):
 
     elif "outplayed.tv" in parsed_url.netloc:
         return {"url": url, "embed": True}
+    
+    elif "clips.twitch.tv" in parsed_url.netloc:
+        # Handle Twitch Clips URLs
+        clip_id = parsed_url.path.lstrip("/")
+        if clip_id:
+            # Construct the embed URL based on Twitch documentation
+            embed_url = f"https://clips.twitch.tv/embed?clip={clip_id}&parent=csfl.cz"
+            return {"url": embed_url, "embed": True}
 
     # If the video id was not found, return the original url
     return {"url": url, "embed": False}
-
 
 
 def allowReportPost(date: datetime, is_response: bool, subject_id: UUID | str, driver_id: UUID) -> bool | HttpResponseBadRequest | HttpResponseForbidden:
@@ -333,7 +358,7 @@ def allowReportPost(date: datetime, is_response: bool, subject_id: UUID | str, d
         driver_id: from driver (id)
 
     Returns:
-        true if user is permitted or the appropriate http response.
+        true if user is permitted else the appropriate http response.
     """
     
     endTime = (date + timedelta(days=1)).replace(hour=23, minute=59, second=59, tzinfo=None)

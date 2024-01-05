@@ -320,6 +320,8 @@ class Penalties(models.Model):
 
     report = models.ForeignKey('Reports', models.DO_NOTHING)
 
+    is_dsq = models.BooleanField(blank=True, null=True)
+
 
 
     class Meta:
@@ -619,4 +621,6 @@ class UsersRoles(models.Model):
         managed = False
 
         db_table = 'users_roles'
+
+        unique_together = (('user', 'role'),)
 
