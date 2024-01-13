@@ -1,14 +1,13 @@
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.db import connection
 import json, traceback
-from ..controllers.uuid import is_valid_uuid
+from urllib.parse import unquote
 
-def getStandings(seasonID: str):
+def getStandings(seasonName: str):
     # treba pridat penalizacie
     # pridane
 
-    if not is_valid_uuid(seasonID):
-        return HttpResponseNotFound()
+    name = unquote(seasonName)
 
     try:
         with connection.cursor() as c:
@@ -31,9 +30,15 @@ def getStandings(seasonID: str):
                             FROM races_drivers AS rd
                             JOIN races AS r ON rd.race_id = r.id
                             LEFT JOIN total_pents AS tp ON tp.race_id = rd.race_id AND rd.driver_id = tp.driver_id
-                            WHERE season_id = %s
+                            WHERE season_id = (SELECT id FROM seasons WHERE name = %s)
                             ORDER BY r.date
                         ) AS results_with_pents
+                    ),
+                    race_wins AS (
+                        SELECT COUNT(*) AS wins_count, driver_id
+                        FROM results
+                        WHERE rank = 1
+                        GROUP BY driver_id
                     ),
                     res_with_points AS (
                         SELECT d.id AS driver_id, d.name AS driver_name, sd.is_reserve, tr.flag, t.name AS team_name, rd.time, rd.has_fastest_lap, re.rank, r.date,
@@ -72,7 +77,7 @@ def getStandings(seasonID: str):
                                         WHEN rd.has_fastest_lap = TRUE AND re.rank <= 10 AND r.is_sprint = FALSE THEN 1
                                         ELSE 0
                                     END
-                            END AS points, r.id AS race_id, tr.id AS track_id, t.color, re.is_dsq
+                            END AS points, r.id AS race_id, tr.id AS track_id, t.color, re.is_dsq, COALESCE(rw.wins_count, 0) AS wins_count
                         FROM seasons_drivers AS sd
                         JOIN races AS r ON r.season_id = sd.season_id
                         JOIN tracks AS tr ON tr.id = r.track_id
@@ -80,29 +85,30 @@ def getStandings(seasonID: str):
                         LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
                         LEFT JOIN teams AS t ON rd.team_id = t.id
                         LEFT JOIN results AS re ON sd.driver_id = re.driver_id AND rd.race_id = re.race_id
-                        WHERE sd.season_id = %s
+                        LEFT JOIN race_wins AS rw ON sd.driver_id = rw.driver_id
+                        WHERE sd.season_id = (SELECT id FROM seasons WHERE name = %s)
                     ),
-					team_colors AS (
-						SELECT driver_id, color
-						FROM seasons_drivers AS sd
-						LEFT JOIN teams AS t ON sd.team_id = t.id
-						WHERE sd.season_id = %s
-					),
+                    team_colors AS (
+                        SELECT driver_id, color
+                        FROM seasons_drivers AS sd
+                        LEFT JOIN teams AS t ON sd.team_id = t.id
+                        WHERE sd.season_id = (SELECT id FROM seasons WHERE name = %s)
+                    ),
                     avg_finish_position AS (
-						SELECT DISTINCT ON (rwp.driver_id) AVG(rank) OVER (PARTITION BY rwp.driver_id), rwp.driver_id, sd.is_reserve
-						FROM res_with_points AS rwp
+                        SELECT DISTINCT ON (rwp.driver_id) AVG(rank) OVER (PARTITION BY rwp.driver_id), rwp.driver_id, sd.is_reserve
+                        FROM res_with_points AS rwp
                         JOIN seasons_drivers AS sd ON sd.driver_id = rwp.driver_id
-						ORDER BY driver_id
-					)
+                        ORDER BY driver_id
+                    )
                     SELECT rwp.*, SUM(points) OVER (PARTITION BY driver_name) AS points_total, COUNT(race_id) OVER (PARTITION BY rwp.driver_id) AS race_count,
                         NOW() > (rwp.date + INTERVAL '3 hours') AS has_been_raced, r.is_sprint, tc.color
                     FROM res_with_points AS rwp
                     JOIN races AS r ON rwp.race_id = r.id
-					JOIN team_colors AS tc ON rwp.driver_id = tc.driver_id
-					JOIN avg_finish_position AS avgfp ON avgfp.driver_id = rwp.driver_id
-                    ORDER BY points_total DESC, avgfp.avg ASC, avgfp.is_reserve, driver_name, rwp.date, r.is_sprint DESC
+                    JOIN team_colors AS tc ON rwp.driver_id = tc.driver_id
+                    JOIN avg_finish_position AS avgfp ON avgfp.driver_id = rwp.driver_id
+                    ORDER BY points_total DESC, wins_count DESC, avgfp.avg ASC, avgfp.is_reserve, driver_name, rwp.date, r.is_sprint DESC
                 """,
-                [seasonID, seasonID, seasonID],
+                [name, name, name],
             )
 
             result = {"drivers": [], "races": [], "teams": [], "penaltyPoints": []}
@@ -113,10 +119,11 @@ def getStandings(seasonID: str):
             if len(data) == 0:
                 return HttpResponse(status=204)
 
-            raceCount = data[0][15]
+            raceCount = data[0][16]
 
             # [0: driver_id, 1: driver_name, 2: is_reserve, 3: flag, 4: team_name, 5: time, 6: has_fastest_lap, 7: rank, 8: date, 9: points,
-            # 10: race_id, 11: track_id, 12: color, 13: is_dsq, 14: points_total, 15: race_count, 16: has_been_raced, 17: is_sprint, 18: color]
+            # 10: race_id, 11: track_id, 12: color, 13: is_dsq, 14: race_wins, 15: points_total, 16: race_count, 
+            # 17: has_been_raced, 18: is_sprint, 19: color]
 
             for i in range(raceCount):
                 result["races"].append(
@@ -132,9 +139,10 @@ def getStandings(seasonID: str):
                     "driverID": str(data[i * raceCount][0]),
                     "driverName": data[i * raceCount][1],
                     "isReserve": data[i * raceCount][2],
-                    "totalPoints": data[i * raceCount][14],
-                    "color": data[i * raceCount][18],
+                    "totalPoints": data[i * raceCount][15],
+                    "color": data[i * raceCount][19],
                     "races": [],
+                    "raceWins": data[i * raceCount][14]
                 }
 
                 for ii in range(raceCount):
@@ -149,7 +157,7 @@ def getStandings(seasonID: str):
                                 data[i * raceCount + ii][7],
                             ),
                             "points": None if data[i * raceCount][2] and data[i * raceCount + ii][4] is None else data[i * raceCount + ii][9],
-                            "hasBeenRaced": data[i * raceCount + ii][16],
+                            "hasBeenRaced": data[i * raceCount + ii][17],
                         }
                     )
 
@@ -175,7 +183,7 @@ def getStandings(seasonID: str):
                             JOIN races AS r ON rd.race_id = r.id
                             JOIN teams AS t ON rd.team_id = t.id
                             LEFT JOIN total_pents AS tp ON rd.driver_id = tp.driver_id AND rd.race_id = tp.race_id
-                            WHERE r.season_id = %s
+                            WHERE r.season_id = (SELECT id FROM seasons WHERE name = %s)
                             ORDER BY date, time
                         ) ranks_with_pents
                     ),
@@ -228,7 +236,7 @@ def getStandings(seasonID: str):
                     FULL JOIN teams AS t ON t.id = team_id
                     ORDER BY sum DESC, t.name
                 """,
-                [seasonID],
+                [name],
             )
             teams = c.fetchall()
 
@@ -271,10 +279,10 @@ def getStandings(seasonID: str):
                     LEFT JOIN races_drivers AS rd ON r.id = rd.race_id AND sd.driver_id = rd.driver_id
                     LEFT JOIN penalty_points AS p ON sd.driver_id = p.driver_id AND r.id = p.race_id
                     LEFT JOIN teams AS t ON sd.team_id = t.id
-                    WHERE sd.season_id = %s
+                    WHERE sd.season_id = (SELECT id FROM seasons WHERE name = %s)
                     ORDER BY t.name, d.id, r.date
                 """,
-                [seasonID],
+                [name],
             )
 
             # [0: driver_id, 1: driver_name, 2: points, 3: points_total, 4: team_icon]
