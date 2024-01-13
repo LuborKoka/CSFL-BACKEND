@@ -1,9 +1,9 @@
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound
 from django.db import connection
-from ..models import SeasonsDrivers, Teams
+from ..models import SeasonsDrivers, Teams, Seasons
 from typing import TypedDict, List
 import json, traceback
-from ..controllers.uuid import is_valid_uuid
+from urllib.parse import unquote
 
 
 class DriversParams(TypedDict):
@@ -23,7 +23,7 @@ class Team(TypedDict):
 # moze byt jeden driver vo viacerych timoch naraz
 
 
-def getTeamDrivers(seasonID: str):
+def getTeamDrivers(seasonName: str):
     """
     driverLineUp.py
     
@@ -31,13 +31,14 @@ def getTeamDrivers(seasonID: str):
         An array of all teams and their drivers.
     """
 
-    if not is_valid_uuid(seasonID):
-        return HttpResponseNotFound()
+    name = unquote(seasonName)
 
     c = connection.cursor()
 
     result = {"teams": [], "availableDrivers": [], "reserves": []}
     try:
+        season = Seasons.objects.get(name=name)
+
         c.execute(
             """
                 WITH excluded AS (
@@ -51,7 +52,7 @@ def getTeamDrivers(seasonID: str):
                 LEFT JOIN excluded AS e ON d.id = e.id
                 WHERE e.id IS NULL
             """,
-            [seasonID],
+            [season.id],
         )
 
         available = c.fetchall()
@@ -71,7 +72,7 @@ def getTeamDrivers(seasonID: str):
 
         for t in teams:
             drivers = SeasonsDrivers.objects.filter(
-                season_id=seasonID, team=t
+                season_id=season.id, team=t
             ).select_related("driver")
             teamDrivers = []
             for d in drivers:
@@ -113,11 +114,12 @@ def getTeamDrivers(seasonID: str):
     return HttpResponse(json.dumps(result), status=200)
 
 
-def postTeamDrivers(seasonID: str, params: Team):
+def postTeamDrivers(seasonName: str, params: Team):
     try:
+        season = Seasons.objects.get(name=unquote(seasonName))
         # ak prichadza o sedacku, nastavim ho ako nahradnika
         for r in params["drivers"]["reserves"]:
-            reserve = SeasonsDrivers.objects.get(season_id=seasonID, driver_id=r)
+            reserve = SeasonsDrivers.objects.get(season_id=season.id, driver_id=r)
             reserve.team = None
             reserve.is_reserve = True
             reserve.save()
@@ -133,7 +135,7 @@ def postTeamDrivers(seasonID: str, params: Team):
     data = []
 
     for d in params["drivers"]["newDrivers"]:
-        data.append((d, seasonID, params["teamID"]))
+        data.append((d, season.id, params["teamID"]))
 
     try:
 

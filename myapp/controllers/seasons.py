@@ -3,6 +3,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 import json, traceback
 from ..models import Seasons
 from typing import TypedDict, List
+from urllib.parse import unquote
 
 
 class PostReservesParams(TypedDict):
@@ -75,8 +76,11 @@ def getAllSeasons():
     return HttpResponse(json.dumps(result), status=200)
 
 
-def getNonReserveDrivers(seasonID: str):
+def getNonReserveDrivers(seasonName: str):
     c = connection.cursor()
+    
+    name = unquote(seasonName)
+
     try:
         result = {"drivers": []}
         c.execute(
@@ -85,7 +89,7 @@ def getNonReserveDrivers(seasonID: str):
                     SELECT DISTINCT ON (d.id) d.id, d.name
                     FROM drivers AS d
                     JOIN seasons_drivers AS sd ON d.id = sd.driver_id
-                    WHERE season_id = %s
+                    WHERE season_id = (SELECT id FROM seasons WHERE name = %s)
                     ORDER BY d.id
                 )
                 SELECT d.id, d.name
@@ -93,7 +97,7 @@ def getNonReserveDrivers(seasonID: str):
                 LEFT JOIN excluded AS e ON d.id = e.id
                 WHERE e.id IS NULL
             """,
-            [seasonID],
+            [name],
         )
 
         drivers = c.fetchall()
@@ -111,19 +115,21 @@ def getNonReserveDrivers(seasonID: str):
 
 
 @transaction.atomic
-def postNewReserves(seasonID: str, params: PostReservesParams):
+def postNewReserves(seasonName: str, params: PostReservesParams):
     c = connection.cursor()
+
+    name = unquote(seasonName)
 
     data = []
 
     for d in params["drivers"]:
-        data.append((d, seasonID))
+        data.append((d, name))
 
     try:
         c.executemany(
             """
                 INSERT INTO seasons_drivers (is_reserve, driver_id, season_id)
-                VALUES (true, %s, %s)
+                VALUES (true, %s, (SELECT id FROM seasons WHERE name = %s))
             """,
             data,
         )
@@ -142,8 +148,11 @@ def postNewReserves(seasonID: str, params: PostReservesParams):
         return HttpResponseBadRequest()
 
 
-def getFiaCandidates(seasonID: str):
+def getFiaCandidates(seasonName: str):
     c = connection.cursor()
+
+    name = unquote(seasonName)
+
     try:
         # vyberie aj current fiu, ALE
         # ta potrebuje byt tiez medzi options, takze je to dobre
@@ -155,7 +164,7 @@ def getFiaCandidates(seasonID: str):
                     FROM users AS u
                     JOIN drivers AS d ON u.driver_id = d.id
                     JOIN seasons_drivers AS sd ON sd.driver_id = d.id
-                    WHERE sd.season_id = %s
+                    WHERE sd.season_id = (SELECT id FROM seasons WHERE name = %s)
                 )
                 SELECT u.id, d.name
                 FROM users AS u
@@ -164,7 +173,7 @@ def getFiaCandidates(seasonID: str):
                 WHERE user_id IS NULL
 
             """,
-            [seasonID],
+            [name],
         )
 
         users = c.fetchall()
@@ -180,9 +189,9 @@ def getFiaCandidates(seasonID: str):
                 JOIN drivers AS d ON d.id = u.driver_id
                 JOIN users_roles AS ur ON ur.user_id = u.id
                 JOIN seasons AS s ON ur.role_id = s.fia_role_id
-                WHERE s.id = %s
+                WHERE s.id = (SELECT id FROM seasons WHERE name = %s)
             """,
-            [seasonID],
+            [name],
         )
 
         current = c.fetchall()
@@ -199,17 +208,19 @@ def getFiaCandidates(seasonID: str):
         return HttpResponseServerError()
 
 
-def postFIA(seasonID: str, params: PostFiaParams):
+def postFIA(seasonName: str, params: PostFiaParams):
     c = connection.cursor()
+
+    name = unquote(seasonName)
 
     data = []
 
     try:
         c.execute(
             """
-                DELETE FROM users_roles WHERE role_id = (SELECT fia_role_id FROM seasons WHERE id = %s)
+                DELETE FROM users_roles WHERE role_id = (SELECT fia_role_id FROM seasons WHERE id = (SELECT id FROM seasons WHERE name = %s))
             """,
-            [seasonID],
+            [name],
         )
 
     except Exception:
@@ -221,13 +232,13 @@ def postFIA(seasonID: str, params: PostFiaParams):
         return HttpResponse(status=204)
 
     for u in params["users"]:
-        data.append((u, seasonID))
+        data.append((u, name))
 
     try:
         c.executemany(
             """
                 INSERT INTO users_roles(user_id, role_id)
-                VALUES (%s, (SELECT fia_role_id FROM seasons WHERE id = %s))
+                VALUES (%s, (SELECT fia_role_id FROM seasons WHERE id = (SELECT id FROM seasons WHERE name = %s)))
             """,
             data,
         )

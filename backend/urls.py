@@ -43,22 +43,22 @@ urlpatterns = [
     path(
         "api/images/tracks/<str:track_id>/", userViews.raceImage
     ),  # mozno ked zrusim icon ako bytea v db a ulozim tie svg ako subory vo file systeme, pouzijem endpoint vyssie
-    path("api/seasons/<str:season_id>/standings/", userViews.standings),
+    path("api/seasons/<str:season_id>/standings/", userViews.standings), #hotovo
     path("api/fia/<str:race_id>/drivers/", userViews.raceReportsFIA),
     path("api/seasons/", sharedViews.seasons),  # seasons.py
     path(
         "api/schedule/<str:season_id>/",  # zlucim dokopy s obycajnym endpointom pre pouzivatela a okrem get metody dam autorizaciu
-        sharedViews.schedule
+        sharedViews.schedule # hotovo
         # vytvorenie pretekov sezony, ziskanie jej pretekov, uprava a vymazanie (toto uz plati pre samotnu sezonu, nie jej preteky, na upravu pretekov bude iny endpoint)
     ),  # scheduleRelated.py; zlucene
-    path("api/season-drivers/<str:season_id>/", sharedViews.seasonDrivers),
+    path("api/season-drivers/<str:season_id>/", sharedViews.seasonDrivers), #hotovo
     path("api/rules/", sharedViews.rules),
     path("api/admins/create-season/", adminViews.createSeasonView),  # seasons.py
     path(
-        "api/admins/season-drivers/<str:season_id>/reserves/", adminViews.seasonReserves
+        "api/admins/season-drivers/<str:season_id>/reserves/", adminViews.seasonReserves #hotovo
     ),
     path(
-        "api/schedule/<str:season_id>/<str:race_id>/", adminViews.changeSchedule
+        "api/schedule/<str:season_id>/<str:race_id>/", adminViews.changeSchedule #hotovo
     ),  # admin route pre mazanie z kalendaru
     path("api/admins/edit-race/<str:race_id>/drivers/", adminViews.editRaceDrivers),
     path("api/admins/edit-race/<str:race_id>/results/", adminViews.editRaceResults),
@@ -66,9 +66,14 @@ urlpatterns = [
         "api/admins/all-tracks/", adminViews.fetchAllTracks
     ),  # scheduleRelated.py, zoznam dostupnych trati pre vytvorenie novej GP
     path(
-        "api/admins/fia/<str:season_id>/", adminViews.seasonFia
+        "api/admins/fia/<str:season_id>/", adminViews.seasonFia #hotovo
     ),  # zoznam vsetkych pouzivatelov dostupnych na poziciu a ulozenie fie
     path("api/admins/users-roles/", adminViews.userRoles),
     path("api/wife-beater/drivers/", adminViews.drivers),
     path("api/wife-beater/roles/", adminViews.changeRoles)
 ]
+
+
+
+
+# 6 routov prepisat

@@ -4,7 +4,7 @@ from ..models import Tracks, Teams, Drivers, Races, SeasonsDrivers, Seasons
 import json, pytz, traceback
 from typing import TypedDict, List, Dict
 from datetime import datetime
-from ..controllers.uuid import is_valid_uuid
+from urllib.parse import unquote
 
 
 class CreateSeasonParams(TypedDict):
@@ -112,7 +112,7 @@ def submitTeamsDrivers(data: SubmitTeamsDriversParams):
 
 
 @transaction.atomic
-def postSchedule(params: PostScheduleParams, seasonID):
+def postSchedule(params: PostScheduleParams, seasonName: str):
     races = []
     sprints = []
 
@@ -123,7 +123,7 @@ def postSchedule(params: PostScheduleParams, seasonID):
             [
                 zone.localize(datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M")),
                 row["trackID"],
-                seasonID,
+                unquote(seasonName),
             ]
         )
 
@@ -134,7 +134,7 @@ def postSchedule(params: PostScheduleParams, seasonID):
                         datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M")
                     ),
                     row["trackID"],
-                    seasonID,
+                    unquote(seasonName),
                 ]
             )
 
@@ -144,7 +144,7 @@ def postSchedule(params: PostScheduleParams, seasonID):
         c.executemany(
             """
                 INSERT INTO races(date, track_id, season_id)
-                VALUES(%s, %s, %s)
+                VALUES(%s, %s, (SELECT id FROM seasons WHERE name = %s))
             """,
             races,
         )
@@ -153,7 +153,7 @@ def postSchedule(params: PostScheduleParams, seasonID):
             c.executemany(
                 """
                     INSERT INTO races(date, track_id, season_id, is_sprint)
-                    VALUES(%s, %s, %s, true)
+                    VALUES(%s, %s, (SELECT id FROM seasons WHERE name = %s), true)
                 """,
                 sprints,
             )
@@ -171,18 +171,18 @@ def postSchedule(params: PostScheduleParams, seasonID):
         return HttpResponseBadRequest()
 
 
-def getSchedule(seasonID):
-    if not is_valid_uuid(seasonID):
-        return HttpResponseNotFound()
-
+def getSchedule(seasonName):
+    name = unquote(seasonName)
     try:
+        season = Seasons.objects.get(name=name)
+
         schedule = (
-            Races.objects.filter(season_id=seasonID)
+            Races.objects.filter(season_id=season.id)
             .select_related("track")
             .order_by("date", "-is_sprint")
         )
 
-        season = Seasons.objects.get(id=seasonID)
+        
 
         result = {"races": [], "seasonName": season.name}
 
@@ -204,9 +204,10 @@ def getSchedule(seasonID):
         return HttpResponseBadRequest()
 
 
-def deleteSchedule(seasonID: str):
+def deleteSchedule(seasonName: str):
+    name = unquote(seasonName)
     try:
-        Seasons.objects.get(id=seasonID).delete()
+        Seasons.objects.get(name=name).delete()
 
         return HttpResponse(status=204)
 
@@ -215,9 +216,11 @@ def deleteSchedule(seasonID: str):
         return HttpResponseBadRequest()
 
 
-def deleteFromSchedule(raceID: str, seasonID: str):
+def deleteFromSchedule(raceID: str, seasonName: str):
+    name = unquote(seasonName)
     try:
-        Races.objects.get(id=raceID, season_id=seasonID).delete()
+        season = Seasons.objects.get(name=name)
+        Races.objects.get(id=raceID, season_id=season.id).delete()
 
         return HttpResponse(status=204)
 
@@ -226,10 +229,13 @@ def deleteFromSchedule(raceID: str, seasonID: str):
         return HttpResponseBadRequest()
 
 
-def patchInSchedule(raceID: str, seasonID: str, params: PatchRaceParams):
+def patchInSchedule(raceID: str, seasonName: str, params: PatchRaceParams):
+    name = unquote(seasonName)
+
     try:
         track = Tracks.objects.get(id=params["trackID"])
-        race = Races.objects.get(id=raceID, season_id=seasonID)
+        season = Seasons.objects.get(name=name)
+        race = Races.objects.get(id=raceID, season_id=season.name)
         race.track = track
         race.date = params["date"]
         race.save()

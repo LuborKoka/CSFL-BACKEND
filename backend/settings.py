@@ -80,7 +80,7 @@ WSGI_APPLICATION = "backend.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "CSFL",
+        "NAME": "CSFL_PROD_COPY",
         "USER": "postgres",
         "PASSWORD": os.getenv("DATABASE_PASSWORD"),
         "HOST": "localhost", 

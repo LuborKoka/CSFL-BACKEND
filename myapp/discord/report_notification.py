@@ -4,6 +4,7 @@ import traceback, requests, os, json
 from datetime import datetime
 from django.http import HttpResponse, HttpResponseServerError
 from ..discord.user_discord import REDIRECT_BASE_URL
+from urllib.parse import quote
 
 
 def notify(reportID: str, isDecision: bool):
@@ -19,15 +20,16 @@ def notify(reportID: str, isDecision: bool):
                 WHERE race_id = (SELECT race_id FROM reports WHERE id = %s)
             )
 
-            SELECT re.created_at, d.name, t.race_name, rr.rank, r.season_id, r.id, da.discord_id, t.emoji
-                FROM reports AS re
-                JOIN races AS r ON re.race_id = r.id
-                JOIN tracks AS t ON r.track_id = t.id
-                JOIN drivers AS d ON re.from_driver = d.id
-                JOIN users AS u ON d.id = u.driver_id
-                LEFT JOIN discord_accounts AS da ON u.id = da.user_id
-                JOIN report_rank AS rr ON re.id = rr.id
-                WHERE re.id = %s
+            SELECT re.created_at, d.name, t.race_name, rr.rank, s.name, r.id, da.discord_id, t.emoji
+            FROM reports AS re
+            JOIN races AS r ON re.race_id = r.id
+            JOIN tracks AS t ON r.track_id = t.id
+            JOIN drivers AS d ON re.from_driver = d.id
+            JOIN users AS u ON d.id = u.driver_id
+            JOIN seasons AS s ON s.id = r.season_id
+            LEFT JOIN discord_accounts AS da ON u.id = da.user_id
+            JOIN report_rank AS rr ON re.id = rr.id
+            WHERE re.id = %s
         """, [reportID, reportID])
 
         report_data = c.fetchall()[0]
@@ -72,7 +74,7 @@ def formatContent(reportID: str, report_data, isDecision: bool):
 Na koho: 
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports?report={report_data[3]})
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{quote(report_data[4])}/race/{report_data[5]}/reports?report={report_data[3]})
         """ 
     
     reporting_driver_name = f'<@{report_data[6]}>' if report_data[6] is not None else report_data[1]
@@ -86,7 +88,7 @@ Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{r
 - {reporting_driver_name}
 {tagReportTargets(reportID)}
 
-Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{report_data[4]}/race/{report_data[5]}/reports?report={report_data[3]})
+Viac info [na tomto odkaze]({REDIRECT_BASE_URL}/seasons/{quote(report_data[4])}/race/{report_data[5]}/reports?report={report_data[3]})
     """
 
 
