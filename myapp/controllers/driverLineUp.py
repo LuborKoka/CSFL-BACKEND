@@ -85,7 +85,7 @@ def getTeamDrivers(seasonName: str):
                     "name": t.name,
                     "drivers": teamDrivers,
                     "color": t.color,
-                    "image": t.logo,
+                    "image": t.icon     # replace '.svg' with '{_light || _dark}_mode.svg
                 }
             )
 
